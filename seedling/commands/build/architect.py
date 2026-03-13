@@ -1,68 +1,7 @@
 import re
-import sys
 from pathlib import Path
-from .utils import ask_yes_no
-
-def extract_tree_block(file_path):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f: lines = f.readlines()
-    except Exception as e:
-        sys.stderr.write(f"\n❌ ERROR reading file: {e}\n")
-        return []
-
-    tree_lines = []
-    in_tree = False
-    for i, line in enumerate(lines):
-        stripped = line.rstrip()
-        if not stripped:
-            if in_tree: break
-            continue
-            
-        has_tree_chars = any(c in line for c in ['├──', '└──', '│'])
-        next_has_tree_chars = False
-        if i + 1 < len(lines):
-            next_has_tree_chars = any(c in lines[i+1] for c in ['├──', '└──', '│'])
-            
-        if has_tree_chars or (not in_tree and next_has_tree_chars):
-            in_tree = True
-            if not stripped.startswith('```'): tree_lines.append(stripped)
-        elif in_tree:
-            if stripped.startswith('```') or not has_tree_chars: break
-                
-    return tree_lines
-
-def extract_file_contents(file_path):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f: lines = f.readlines()
-    except Exception:
-        return {}
-        
-    file_contents = {}
-    current_file = None
-    in_code_block = False
-    current_content = []
-    
-    for line in lines:
-        if line.startswith('### FILE: '):
-            current_file = line.replace('### FILE: ', '').strip().replace('\\', '/')
-            current_content = []
-            in_code_block = False
-            continue
-            
-        if current_file:
-            if line.startswith('```') and not in_code_block:
-                in_code_block = True
-                continue
-            elif line.startswith('```') and in_code_block:
-                in_code_block = False
-                file_contents[current_file] = "".join(current_content)
-                current_file = None
-                continue
-                
-            if in_code_block:
-                current_content.append(line)
-                
-    return file_contents
+from seedling.core.ui import ask_yes_no
+from seedling.core.io import extract_tree_block, extract_file_contents
 
 def build_structure_from_file(source_file, target_dir, check_mode=False, force_mode=False):
     tree_lines = extract_tree_block(source_file)
@@ -97,9 +36,6 @@ def build_structure_from_file(source_file, target_dir, check_mode=False, force_m
         if not any(item['depth'] == 0 for item in parsed_items[1:]):
             parsed_items.pop(0)
 
-    # ==========================================
-    # CHECK MODE
-    # ==========================================
     if check_mode:
         print(f"\n🔍 [CHECK MODE] Simulating build in: {target_path}")
         missing, existing = set(), set()
@@ -128,9 +64,6 @@ def build_structure_from_file(source_file, target_dir, check_mode=False, force_m
             print("✅ Everything is already perfectly built!")
             return True
 
-    # ==========================================
-    # ACTUAL BUILD
-    # ==========================================
     print(f"\n🏗️  Building structure in: {target_path} ...\n")
     if file_contents:
         print(f"📦 Discovered source code for {len(file_contents)} files! Restoring magic...\n")

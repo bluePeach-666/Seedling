@@ -4,19 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Seedling-tools"
-version = "2.1.0"
-description = "A 3-in-1 CLI toolkit to explore, search, and reconstruct directory structures with LLM-ready context support."
+version = "2.2.0"
+description = "A modular 3-in-1 CLI toolkit to explore, search, and reconstruct directory structures with LLM-ready context support."
 readme = "README.md"
 authors = [
     { name = "Blue Peach" }
 ]
 requires-python = ">=3.8"
-keywords = ["cli", "directory-tree", "llm-context", "scaffolding", "developer-tools"]
+keywords = [
+    "python", "cli", "productivity", "terminal", "developer-tools", 
+    "directory-tree", "scaffolding", "llm", "context-window", "ai-tools"
+]
+license = {text = "MIT"}
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Utilities"
 ]
 dependencies = [
     "Pillow>=9.0.0"
@@ -24,8 +30,10 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/bbpeaches/Seedling"
+Repository = "https://github.com/bbpeaches/Seedling.git"
 Issues = "https://github.com/bbpeaches/Seedling/issues"
+Changelog = "https://github.com/bbpeaches/Seedling/blob/main/CHANGELOG.md"
 
 [project.scripts]
-scan = "scan_tool.cli:main"
-build = "scan_tool.cli:build_entry"
+scan = "seedling.main:scan"
+build = "seedling.main:build"

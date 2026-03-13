@@ -1,5 +1,5 @@
 """
-🌲 Seedling (formerly Directory Tree Scanner)
+🌲 Seedling
 =============================================
 A powerful 3-in-1 CLI toolkit to:
 1. SCAN: Export directory structures to MD, TXT, or Images.
@@ -12,21 +12,19 @@ Author: Blue Peach
 from importlib.metadata import version, PackageNotFoundError
 
 try:
-    __version__ = version("Seedling")
+    __version__ = version("Seedling-tools")
 except PackageNotFoundError:
     __version__ = "dev"
 
-from .cli import main, build_entry
-from .scanner import scan_dir_lines, search_items
-from .builder import build_structure_from_file
-
 __author__ = "Blue Peach"
 
+from .core.filesystem import scan_dir_lines, search_items, get_full_context
+from .commands.build.architect import build_structure_from_file
+
 __all__ = [
-    "main", 
-    "build_entry", 
-    "scan_dir_lines", 
-    "search_items", 
+    "scan_dir_lines",
+    "search_items",
+    "get_full_context",
     "build_structure_from_file",
     "__version__"
 ]

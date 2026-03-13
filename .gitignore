@@ -6,12 +6,10 @@ __pycache__/
 .ipynb_checkpoints/
 
 # --- Distribution & Build Artifacts ---
-# These are generated when you run 'pip install' or 'build'
 dist/
-build/
 *.egg-info/
 egg-info/
-Seedling.egg-info/
+Seedling_tools.egg-info/
 nosetests.xml
 coverage.xml
 *.cover
@@ -22,6 +20,8 @@ venv/
 .venv/
 env/
 .env/
+venv_common/
+ENV/
 bin/
 lib/
 include/
@@ -36,19 +36,21 @@ Thumbs.db
 desktop.ini
 
 # --- Editor Specific ---
-# VS Code
 .vscode/
-# PyCharm / IntelliJ
 .idea/
 
-# --- TreeWeaver Generated Reports & Local Test & CLI Outputs---
-seedling_test_sandbox_out/
+# --- Seedling Generated Reports & Local Tests ---
 seedling_test_sandbox/
+seedling_test_sandbox_out/
+seedling_chaos_sandbox/
+seedling_chaos_sandbox_out/
+Seedling*.md
+Seedling*.txt
+Seedling*.png
 *_search_*.md
 *_search_*.txt
 test_output/
-Seedling.md
-*.png
+*_out/
 
 # --- Python Tools / Typing ---
 .mypy_cache/
