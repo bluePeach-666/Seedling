@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-03-14
+
+### 🛡️ Security & Safety
+- **Path Traversal Prevention (Phase 1 Sandbox)**: Completely restructured the `build` engine to include a dedicated pre-processing phase. It now strictly enforces absolute path resolution and `.is_relative_to()` boundary checks *before* any disk operations occur. Maliciously crafted tree diagrams attempting to escape the target directory (e.g., via `../../../etc/passwd`) are instantly blocked.
+- **`--delete` TTY Safety Lock**: Hardened the dangerous deletion mode in `search`. It now strictly checks for an interactive terminal (`sys.stdin.isatty()`) to block piped/automated deletions (e.g., `echo "y" | scan ...`). Furthermore, it requires the user to explicitly type `"CONFIRM DELETE"` instead of a simple `y/n`, preventing catastrophic accidents in CI/CD pipelines.
+- **Fail-Safe Test Suite**: Upgraded the `test_suite.sh` cleanup procedures. Replaced risky removal commands with strict bash parameter expansions (`rm -rf "${DIR:?Variable not set}"`) to ensure a missing environment variable never results in a wiped root or home directory.
+
+### 🚀 Core Engine & Performance (The "Unbreakable" Engine)
+- **Recursion DoS Prevention**: Completely rewrote the directory traversal engine in `filesystem.py`. It has been migrated from a recursive approach to a **Stack-based Iterative Depth-First Search (DFS)**. Paired with a hardcoded `MAX_ITERATION_DEPTH = 1000`, Seedling is now immune to `RecursionError` and stack overflow crashes, even when scanning maliciously deep nested directories.
+- **Auto OOM Protection (Hardware Probe)**: Deprecated manual memory limits. Introduced `sysinfo.py` to dynamically probe the host's physical RAM across Mac, Linux, and Windows. The `--full` context aggregator now enforces a strict 10% physical RAM ceiling (with a 512MB fallback). If the threshold is breached, Seedling instantly trips the circuit breaker to protect the host machine from Out-Of-Memory (OOM) kills.
+- **Heuristic Binary Detection**: Added a pre-read scanner (`is_binary_content`) that checks the first 1024 bytes of a file for null bytes (`\x00`). This silently detects and ejects extension-less binaries masquerading as text, preventing thousands of lines of garbage from polluting LLM context windows.
+- **Smart Encoding Fallback Chain**: Replaced brute-force `errors='strict'` with an intelligent fallback chain (`UTF-8 -> GBK -> Big5 -> UTF-16 -> Latin-1`). This guarantees flawless reading of legacy codebases without producing `\ufffd` corruption.
+
+### 🐛 Compatibility & Bug Fixes
+- **Cross-Platform Path Injection (The `PureWindowsPath` Magic)**: Fixed a severe `KeyError` bug where blueprint text generated on Windows (containing `\` separators) would fail to restore code blocks when `build` was executed on macOS/Linux. By replacing manual `.replace('\\', '/')` with Python's native `PureWindowsPath` engine, Seedling now flawlessly understands and converts Windows paths regardless of the host OS.
+- **Headless Server Font Fallback**: Fixed a crash in the `image` export mode when executed on headless Linux servers (e.g., AWS/Aliyun) lacking CJK fonts. The engine now gracefully falls back to Pillow's default built-in font rather than throwing a fatal error.
+
+### ✨ UX & Code Refactoring
+- **Centralized Logging & True Quiet API**: Completely decoupled console output from the core business logic. Replaced hundreds of scattered `print()` statements with a centralized `logger.py` featuring a custom `CLIFormatter`. When used as a Python package with `quiet=True` (or `-q` in CLI), Seedling is now completely silent, ensuring zero stdout pollution for host applications.
+- **Global Filter Deduplication**: Abstracted all exclusion logic (hidden files, `--exclude` lists, `--text` filtering) into a single, unified `is_valid_item()` function. This massive refactor wiped out hundreds of lines of redundant checks across the scan, search, and context aggregation engines.
+- **Export Overwrite Protection**: The `scan` and `search` file generation routines now verify if the output file already exists, prompting users with a `[y/n]` safety check before overwriting historical snapshots.
+- **Interactive Easter Egg Cooling**: Modified the aggressive `rm -rf /` visual joke triggered by empty `scan` calls. It is now safely locked behind an opt-in "Chaos Mode" confirmation, defaulting to a harmless "brewing coffee" animation for startled users.
+
 ## [2.2.1] - 2026-03-13
 
 ### 🚨 Security Hotfixes

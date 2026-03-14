@@ -1,4 +1,5 @@
 import argparse
+import sys
 from seedling import __version__
 from seedling.commands.scan import setup_scan_parser, handle_scan
 from seedling.commands.build import setup_build_parser, handle_build
@@ -12,8 +13,12 @@ def scan():
         prog="scan"
     )
     setup_scan_parser(parser)
-    args = parser.parse_args()
-    handle_scan(args)
+    try:
+        args = parser.parse_args()
+        handle_scan(args)
+    except KeyboardInterrupt:
+        print("\n\n👋 Interrupted by user. Exiting Seedling...")
+        sys.exit(0)
 
 def build():
     parser = argparse.ArgumentParser(
@@ -22,5 +27,9 @@ def build():
         prog="build"
     )
     setup_build_parser(parser)
-    args = parser.parse_args()
-    handle_build(args)
+    try:
+        args = parser.parse_args()
+        handle_build(args)
+    except KeyboardInterrupt:
+        print("\n\n👋 Interrupted by user. Exiting Seedling...")
+        sys.exit(0)

@@ -6,6 +6,32 @@ import random
 import io
 from pathlib import Path
 
+# UI configurations
+UI_CONFIG = {
+    "DIR": "📁",
+    "FILE": "📄",
+    "MATCH": "🎯",
+    "WAIT": "⏳",
+    "SUCCESS": "🎉"
+}
+
+def setup_ui_theme(no_emoji=False):
+    is_old_windows = False
+    try:
+        is_old_windows = sys.platform == "win32" and os.get_terminal_size().columns < 10
+    except OSError:
+        pass
+    
+    has_no_color = "NO_COLOR" in os.environ
+    if no_emoji or is_old_windows or has_no_color:
+        UI_CONFIG.update({
+            "DIR": "[DIR]",
+            "FILE": "[FILE]",
+            "MATCH": "[MATCHED]",
+            "WAIT": "...",
+            "SUCCESS": "SUCCESS"
+        })
+
 def ensure_utf8_output():
     if sys.platform == "win32" and hasattr(sys.stdout, 'buffer'):
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -115,19 +141,35 @@ def handle_empty_run():
         print("\n\n   (Beautiful! Now give me a real folder to scan!)\n")
         sys.exit(0)
     else:
-        text = f"\n🤖 [ Easter Egg ] Okay, you've typed 'scan' {count} times with no arguments.\nInitiating bored-user protocol. Wiping system drive...\n\n"
-        for char in text:
-            sys.stdout.write(char)
-            sys.stdout.flush()
-            time.sleep(0.03)
-        sys.stdout.write("   rm -rf / : [")
-        for i in range(25):
-            sys.stdout.write("█")
-            sys.stdout.flush()
-            time.sleep(random.uniform(0.01, 0.2))
-        print("] 100%")
-        time.sleep(1)
-        print("\n   ...Just kidding! 😂 But seriously, try typing 'scan -h'.\n")
+        print(f"\n🤖 [ Seedling ] You've called 'scan' {count} times without any arguments.")
+        print("I'm starting to get a bit... bored.")
+
+        if ask_yes_no("\n👉 Enable 'Experimental Chaos Mode' to see what happens? [y/n]: "):
+            text = f"\n⚠️  [ SYSTEM CRITICAL ] Initiating forced cleanup. Wiping system drive to save energy...\n\n"
+            for char in text:
+                sys.stdout.write(char)
+                sys.stdout.flush()
+                time.sleep(0.04)
+            
+            sys.stdout.write("   rm -rf / : [")
+            for i in range(25):
+                sys.stdout.write("█")
+                sys.stdout.flush()
+                time.sleep(random.uniform(0.01, 0.3))
+            print("] 100%")
+            
+            time.sleep(1)
+            print("\n   ...Just kidding! 😂 You've got nerves of steel. Now go scan some real files!")
+        else:
+            print("\n   Wise choice. Let's just brew some virtual coffee instead...\n")
+            sys.stdout.write("   Brewing : [")
+            for i in range(25):
+                sys.stdout.write("☕")
+                sys.stdout.flush()
+                time.sleep(0.05)
+            print("] 100%")
+            print("\n   (Feeling better? Try 'scan --help' when you're ready!)\n")
+            
         sys.exit(0)
 
 def handle_empty_build_run():

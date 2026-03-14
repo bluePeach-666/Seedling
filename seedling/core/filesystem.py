@@ -2,35 +2,66 @@ import sys
 import difflib
 from pathlib import Path
 from .ui import print_progress_bar
+from .logger import logger 
+from .sysinfo import get_system_mem_limit_mb, get_system_depth_limit 
 
+MAX_FILE_SIZE = 2 * 1024 * 1024 # 2MB
+MAX_ITERATION_DEPTH = 1000      # 显式深度硬上限
+HARD_DEPTH_LIMIT = min(get_system_depth_limit(), MAX_ITERATION_DEPTH)
+
+SPECIAL_TEXT_NAMES = {'makefile', 'dockerfile', 'license', 'caddyfile', 'procfile'}
 TEXT_EXTENSIONS = {
-    # --- C / C++ / CUDA ---
-    '.c', '.h', 
-    '.cpp', '.cc', '.cxx', '.c++', '.cp',          
+    '.c', '.h', '.cpp', '.cc', '.cxx', '.c++', '.cp',          
     '.hpp', '.hxx', '.h++', '.hh', '.inc', '.inl', 
-    '.cu', '.cuh',                                 # CUDA 
-    
-    # --- order ---
+    '.cu', '.cuh',                                             
     '.py', '.js', '.ts', '.java', '.go', '.rs', '.cs',
-
-    # --- config ---
     '.html', '.css', '.md', '.txt', 
     '.json', '.yaml', '.yml', '.toml', '.xml', 
     '.ini', '.cfg', '.csv',
-
-    # --- bash ---
     '.sh', '.bat', '.ps1', '.sql'
 }
-SPECIAL_TEXT_NAMES = {'makefile', 'dockerfile', 'license', 'caddyfile', 'procfile'}
 
 def is_text_file(file_path):
-    if file_path.suffix.lower() in TEXT_EXTENSIONS:
-        return True
-    if file_path.name.lower() in SPECIAL_TEXT_NAMES:
-        return True
-    if file_path.name.startswith('.') and not file_path.suffix:
-        return True
+    if file_path.suffix.lower() in TEXT_EXTENSIONS: return True
+    if file_path.name.lower() in SPECIAL_TEXT_NAMES: return True
+    if file_path.name.startswith('.') and not file_path.suffix: return True
     return False
+
+def is_binary_content(file_path):
+    try:
+        with open(file_path, 'rb') as f:
+            chunk = f.read(1024)
+            if b'\x00' in chunk:
+                return True
+    except Exception:
+        return True 
+    return False
+
+def is_valid_item(item, show_hidden, excludes, text_only):
+    if not show_hidden and item.name.startswith('.'): 
+        return False
+    if item.name in excludes: 
+        return False
+    if text_only and item.is_file() and not is_text_file(item): 
+        return False
+    return True
+
+def safe_read_text(file_path, quiet=False):
+    if is_binary_content(file_path):
+        return None
+
+    encodings = ['utf-8', 'gbk', 'big5', 'utf-16', 'latin-1']
+    
+    for enc in encodings:
+        try:
+            with open(file_path, 'r', encoding=enc, errors='strict') as f:
+                return f.read()
+        except (UnicodeDecodeError, LookupError):
+            continue
+
+    if not quiet:
+        logger.warning(f"Skipped {file_path.name}: Unsupported encoding.")
+    return None
 
 def scan_dir_lines(dir_path, prefix="", max_depth=None, current_depth=0, show_hidden=False, excludes=None, stats=None, highlights=None, text_only=False, quiet=False):
     if excludes is None: excludes = []
@@ -38,137 +69,163 @@ def scan_dir_lines(dir_path, prefix="", max_depth=None, current_depth=0, show_hi
     if highlights is None: highlights = set()
         
     lines = []
-    if max_depth is not None and current_depth > max_depth: return lines
     path = Path(dir_path)
 
-    try:
-        items = list(path.iterdir())
-        valid_items = []
-        for item in items:
-            if not show_hidden and item.name.startswith('.'): continue
-            if item.name in excludes: continue
-            if text_only and item.is_file() and not is_text_file(item): continue 
-            valid_items.append(item)
-            
+    def get_valid_children(p):
+        valid_items = [
+            item for item in p.iterdir() 
+            if is_valid_item(item, show_hidden, excludes, text_only)
+        ]
         valid_items.sort(key=lambda x: (not x.is_dir(), x.name.lower()))
+        return valid_items
+
+    try:
+        initial_items = get_valid_children(path)
     except PermissionError:
         lines.append(f"{prefix}[Permission Denied - Cannot read directory]")
         return lines
+
+    stack = []
+    for i in range(len(initial_items) - 1, -1, -1):
+        item = initial_items[i]
+        is_last = (i == len(initial_items) - 1)
+        stack.append((item, current_depth + 1, prefix, is_last))
+
+    while stack:
+        item, depth, curr_prefix, is_last = stack.pop()
+
+        if depth > HARD_DEPTH_LIMIT:
+            if not quiet: lines.append(f"{curr_prefix}└── ⚠️ [SYSTEM MAX DEPTH REACHED]")
+            continue
         
-    for index, item in enumerate(valid_items):
-        is_last = index == (len(valid_items) - 1)
         connector = "└── " if is_last else "├── "
         symlink_mark = " (symlink)" if item.is_symlink() else ""
         match_mark = " 🎯 [MATCHED]" if item in highlights else ""
-        
         display_name = f"{item.name}/" if item.is_dir() else item.name
         
-        lines.append(f"{prefix}{connector}{display_name}{symlink_mark}{match_mark}")
+        lines.append(f"{curr_prefix}{connector}{display_name}{symlink_mark}{match_mark}")
         
-        if item.is_dir():
-            stats["dirs"] += 1
-            if not item.is_symlink():
-                extension = "    " if is_last else "│   "
-                lines.extend(scan_dir_lines(
-                    item, prefix=prefix + extension, max_depth=max_depth, 
-                    current_depth=current_depth + 1, show_hidden=show_hidden,
-                    excludes=excludes, stats=stats, highlights=highlights, text_only=text_only, quiet=quiet
-                ))
-        else:
-            stats["files"] += 1
+        if item.is_dir(): stats["dirs"] += 1
+        else: stats["files"] += 1
             
         total_scanned = stats["dirs"] + stats["files"]
         if not quiet and total_scanned % 15 == 0:
             print_progress_bar(total_scanned, label="Scanning", icon="⏳")
+
+        if item.is_dir() and not item.is_symlink():
+            if max_depth is not None and depth > max_depth:
+                continue  
+                
+            try:
+                children = get_valid_children(item)
+            except PermissionError:
+                extension = "    " if is_last else "│   "
+                lines.append(f"{curr_prefix}{extension}[Permission Denied - Cannot read directory]")
+                continue
+                
+            extension = "    " if is_last else "│   "
+            new_prefix = curr_prefix + extension
             
+            for i in range(len(children) - 1, -1, -1):
+                child = children[i]
+                child_is_last = (i == len(children) - 1)
+                stack.append((child, depth + 1, new_prefix, child_is_last))
+                
     return lines
 
 def search_items(dir_path, keyword, show_hidden=False, excludes=None, text_only=False, quiet=False):
     if excludes is None: excludes = []
-        
+
     exact_matches = []
-    all_names = []
+    all_names_with_path = [] 
     keyword_lower = keyword.lower()
-    scan_stats = {"count": 0} 
-    
-    def walk(current_path):
+    scan_stats = {"count": 0}  
+
+    stack = [Path(dir_path)]
+    seen_paths = set() 
+
+    while stack:
+        current_path = stack.pop()
         try:
             for item in current_path.iterdir():
-                if not show_hidden and item.name.startswith('.'): continue
-                if item.name in excludes: continue
-                if text_only and item.is_file() and not is_text_file(item): continue 
-                
+                if item in seen_paths: continue
+                seen_paths.add(item)
+
+                if not is_valid_item(item, show_hidden, excludes, text_only):
+                    continue
+
                 scan_stats["count"] += 1
-                all_names.append((item.name, item)) 
-                
+                all_names_with_path.append((item.name, item))            
+
                 if keyword_lower in item.name.lower():
-                    exact_matches.append(item)
-                    
+                    exact_matches.append(item)         
+
                 if not quiet and scan_stats["count"] % 10 == 0:
                     print_progress_bar(scan_stats["count"], label="Searching", icon="🔍")
-                    
+
                 if item.is_dir() and not item.is_symlink():
-                    walk(item)
+                    stack.append(item)
         except PermissionError: pass
-            
-    walk(Path(dir_path))
-    
+
     if not quiet:
         sys.stdout.write(f"\r✅ Search complete! Scanned {scan_stats['count']} items.                \n")
         sys.stdout.flush()
-    
-    exact_match_paths = {ex for ex in exact_matches}
-    remaining_unique_names = list(set([name for name, item in all_names if item not in exact_match_paths]))
-    
-    close_names = difflib.get_close_matches(keyword, remaining_unique_names, n=10, cutoff=0.4)
+
+    exact_match_paths = {ex.resolve() for ex in exact_matches}
+    unique_names_for_fuzzy = list(set([name for name, path in all_names_with_path if path.resolve() not in exact_match_paths]))
+    close_names = difflib.get_close_matches(keyword, unique_names_for_fuzzy, n=10, cutoff=0.4)
     close_names_set = set(close_names)
-    
-    fuzzy_matches = [item for name, item in all_names if name in close_names_set and item not in exact_match_paths]
-    
+
+    fuzzy_matches = []
+    fuzzy_seen = set()
+
+    for name, path in all_names_with_path:
+        p_res = path.resolve()
+        if name in close_names_set and p_res not in exact_match_paths and p_res not in fuzzy_seen:
+            fuzzy_matches.append(path)
+            fuzzy_seen.add(p_res)
+
     return exact_matches, fuzzy_matches
 
 def get_full_context(target_path, show_hidden=False, excludes=None, text_only=False, max_depth=None, quiet=False):
     if excludes is None: excludes = []
     context_data = []
     
-    MAX_FILE_SIZE = 2 * 1024 * 1024  
+    dynamic_mem_limit_mb = get_system_mem_limit_mb()
+    TOTAL_MAX_MEMORY = dynamic_mem_limit_mb * 1024 * 1024
+    current_total_memory = 0
     
-    def walk(current_path, current_depth=0):
-        if max_depth is not None and current_depth > max_depth:
-            return
+    stack = [(Path(target_path), 0)]
+    
+    while stack:
+        current_path, current_depth = stack.pop()
+        
+        effective_depth = max_depth if max_depth is not None else HARD_DEPTH_LIMIT
+        if current_depth > effective_depth or current_depth > HARD_DEPTH_LIMIT:
+            continue
             
         try:
             items = sorted(list(current_path.iterdir()), key=lambda x: (not x.is_dir(), x.name.lower()))
             for item in items:
-                if not show_hidden and item.name.startswith('.'): continue
-                if item.name in excludes: continue
-                
+                if not is_valid_item(item, show_hidden, excludes, text_only): 
+                    continue
+                    
                 if item.is_file():
-                    is_txt = is_text_file(item)
-                    if (text_only and not is_txt) or not is_txt: 
-                        continue
-
                     try:
-                        if item.stat().st_size > MAX_FILE_SIZE:
-                            continue
+                        f_stat = item.stat()
+                        if f_stat.st_size > MAX_FILE_SIZE: continue
                         
-                        if not quiet:
-                            sys.stdout.write(f"\r📖 Reading: {item.name[:30]:<30}... ")
-                            sys.stdout.flush()
-                            
-                        content = item.read_text(encoding='utf-8', errors='replace')
-                        rel_path = item.relative_to(target_path)
-                        context_data.append((rel_path, content))
+                        if current_total_memory + f_stat.st_size > TOTAL_MAX_MEMORY:
+                            logger.error(f"Hardware memory safety limit ({dynamic_mem_limit_mb}MB) reached! Aborting further reads to protect system RAM.")
+                            return context_data
+
+                        content = safe_read_text(item, quiet=quiet)
+                        if content is not None:
+                            context_data.append((item.relative_to(target_path), content))
+                            current_total_memory += f_stat.st_size
                     except Exception: pass
                 elif item.is_dir() and not item.is_symlink():
-                    walk(item, current_depth + 1)
+                    stack.append((item, current_depth + 1))
         except PermissionError: pass
-
-    try:
-        walk(target_path)
-    except KeyboardInterrupt:
-        if not quiet:
-            sys.stdout.write("\n\n⚠️ [WARN] Read operation interrupted by user! Saving aggregated content so far...\n")
-            sys.stdout.flush()
-        
+            
     return context_data

@@ -2,6 +2,8 @@ import sys
 from pathlib import Path
 from seedling.core.filesystem import scan_dir_lines
 from seedling.core.io import create_image_from_text
+from seedling.core.ui import ask_yes_no
+from seedling.core.logger import logger
 from .full import run_full
 
 def run_explorer(args, target_path):
@@ -16,12 +18,27 @@ def run_explorer(args, target_path):
         out_name += ext_map[args.format]
         
     final_file = out_dir_path / out_name
+
+    if final_file.exists():
+        logger.warning(f"NOTICE: Output file already exists:\n   👉 {final_file}")
+        if not ask_yes_no("Do you want to overwrite it? [y/n]: "):
+            logger.info("Aborted. No changes were made.")
+            return
     
     stats = {"dirs": 0, "files": 0}
-    lines = scan_dir_lines(target_path, max_depth=args.depth, show_hidden=args.show_hidden, excludes=args.exclude, stats=stats, text_only=args.text_only)
+    lines = scan_dir_lines(
+        target_path, 
+        max_depth=args.depth,
+        show_hidden=args.show_hidden, 
+        excludes=args.exclude, 
+        stats=stats, 
+        text_only=args.text_only,
+        quiet=args.quiet
+    )
     
-    sys.stdout.write(f"\r✅ Scan Complete! [ 📁 {stats['dirs']} dirs | 📄 {stats['files']} files ]            \n")
-    sys.stdout.flush()
+    if not args.quiet:
+        sys.stdout.write(f"\r✅ Scan Complete! [ 📁 {stats['dirs']} dirs | 📄 {stats['files']} files ]            \n")
+        sys.stdout.flush()
     
     root_name = target_path.name or str(target_path)
     tree_text = f"{root_name}/\n" + "\n".join(lines) + f"\n\n[ 📁 {stats['dirs']} directories, 📄 {stats['files']} files ]"
@@ -48,4 +65,4 @@ def run_explorer(args, target_path):
         success = create_image_from_text(tree_text, final_file, len(lines))
             
     if success:
-        print(f"🎉 SUCCESS! Directory structure saved to:\n   👉 {final_file}\n")
+        logger.info(f"🎉 SUCCESS! Directory structure saved to:\n   👉 {final_file}\n")

@@ -2,10 +2,11 @@ import sys
 import shutil 
 from pathlib import Path
 from seedling.core.ui import ask_yes_no
-from seedling.core.filesystem import search_items, scan_dir_lines, is_text_file
+from seedling.core.logger import logger
+from seedling.core.filesystem import search_items, scan_dir_lines, is_text_file, safe_read_text
 
 def run_search(args, target_path):
-    exact, fuzzy = search_items(target_path, args.find, args.show_hidden, args.exclude, args.text_only)
+    exact, fuzzy = search_items(target_path, args.find, args.show_hidden, args.exclude, args.text_only, args.quiet)
     all_matches = exact + fuzzy
     
     def format_item(item):
@@ -14,21 +15,28 @@ def run_search(args, target_path):
         return f"{prefix} {rel}"
 
     if exact:
-        print(f"\n🎯 Exact matches for '{args.find}':")
-        for item in exact[:20]: print(f" {format_item(item)}")
+        logger.info(f"\n🎯 Exact matches for '{args.find}':")
+        for item in exact[:20]: logger.info(f" {format_item(item)}")
     else:
-        print(f"\n❓ No exact matches found for '{args.find}'.")
+        logger.info(f"\n❓ No exact matches found for '{args.find}'.")
 
     if fuzzy:
-        print(f"\n💡 Did you mean one of these? (Fuzzy matches):")
-        for item in fuzzy[:10]: print(f" {format_item(item)}")
+        logger.info(f"\n💡 Did you mean one of these? (Fuzzy matches):")
+        for item in fuzzy[:10]: logger.info(f" {format_item(item)}")
 
     if not all_matches:
-        print("\n❌ No matches found. Aborting document generation.")
+        logger.error("No matches found. Aborting document generation.")
         return
 
     if args.delete:
-        if ask_yes_no(f"\n⚠️ WARNING: You are about to PERMANENTLY DELETE {len(all_matches)} matched items! Proceed? [y/n]: "):
+        if not sys.stdin.isatty():
+            logger.error("Dangerous operation '--delete' can only be used in an interactive terminal.")
+            return
+
+        logger.warning(f"\nCRITICAL WARNING: You are about to PERMANENTLY DELETE {len(all_matches)} items.")
+        confirm = input(f"👉 Please type 'CONFIRM DELETE' to proceed: ").strip()
+        
+        if confirm == "CONFIRM DELETE":
             deleted_count = 0
             for item in all_matches:
                 if not item.exists():
@@ -39,30 +47,48 @@ def run_search(args, target_path):
                     else:
                         item.unlink()
                     deleted_count += 1
-                    print(f" 🗑️ Deleted: {item.relative_to(target_path)}")
+                    logger.info(f" 🗑️ Deleted: {item.relative_to(target_path)}")
                 except Exception as e:
-                    print(f" ❌ Failed to delete {item.relative_to(target_path)}: {e}")
-            print(f"\n✅ Successfully deleted {deleted_count} items. Operation complete.")
+                    logger.error(f" Failed to delete {item.relative_to(target_path)}: {e}")
+            logger.info(f"\n✅ Successfully deleted {deleted_count} items. Operation complete.")
             return 
         else:
-            print("\n⏭️ Deletion aborted. Proceeding to generate search report...")
+            logger.info("\n⏭️ Deletion aborted. No changes were made.")
+            return
 
     append_full = False
     if args.full:
         if ask_yes_no(f"\n🚀 Power Mode triggered! Do you want to append the full source code for these {len(all_matches)} matches? [y/n]: "):
             append_full = True
         else:
-            print("Skipping full source code appending.")
+            logger.info("Skipping full source code appending.")
 
     out_dir = Path(args.outdir).resolve() if args.outdir else Path.cwd()
     target_name = target_path.name or "root"
     search_filename = args.name or f"{target_name}_search_{args.find}.md"
     final_search_file = out_dir / search_filename
 
+    if final_search_file.exists():
+            logger.warning(f"NOTICE: Search report already exists:\n   👉 {final_search_file}")
+            if not ask_yes_no("Do you want to overwrite it? [y/n]: "):
+                logger.info("Aborted. No report was generated.")
+                return
+        
     highlights = set(all_matches)
     stats = {"dirs": 0, "files": 0}
-    lines = scan_dir_lines(target_path, max_depth=args.depth, show_hidden=args.show_hidden, excludes=args.exclude, stats=stats, highlights=highlights, text_only=args.text_only)
-    sys.stdout.write(f"\r✅ Tree generation complete!                      \n")
+    lines = scan_dir_lines(
+        target_path, 
+        max_depth=args.depth, 
+        show_hidden=args.show_hidden, 
+        excludes=args.exclude, 
+        stats=stats, 
+        highlights=highlights, 
+        text_only=args.text_only,
+        quiet=args.quiet
+    )
+    
+    if not args.quiet:
+        sys.stdout.write(f"\r✅ Tree generation complete!                      \n")
     
     tree_text = f"{target_path.name}/\n" + "\n".join(lines)
 
@@ -86,10 +112,12 @@ def run_search(args, target_path):
                 f.write("============================================================\n\n")
                 for m in all_matches:
                     if m.is_file() and is_text_file(m):
-                        f.write(f"### FILE: {m.relative_to(target_path)}\n")
-                        lang = m.suffix.lstrip('.')
-                        f.write(f"```{lang}\n{m.read_text(encoding='utf-8', errors='replace')}\n```\n\n")
-
-        print(f"\n✅ Full results saved to:\n   👉 {final_search_file}\n")
+                        content = safe_read_text(m, quiet=True)
+                        if content is not None:
+                            f.write(f"### FILE: {m.relative_to(target_path)}\n")
+                            lang = m.suffix.lstrip('.')
+                            f.write(f"```{lang}\n{content}\n```\n\n")
+                            
+        logger.info(f"\n✅ Full results saved to:\n   👉 {final_search_file}\n")
     except Exception as e:
-        print(f"\n❌ Failed to save search results: {e}")
+        logger.error(f"Failed to save search results: {e}")

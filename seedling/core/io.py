@@ -1,12 +1,14 @@
 import sys
 import platform
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+from .logger import logger
 
 def extract_tree_block(file_path):
     try:
-        with open(file_path, 'r', encoding='utf-8') as f: lines = f.readlines()
+        with open(file_path, 'r', encoding='utf-8') as f: 
+            lines = f.readlines()
     except Exception as e:
-        sys.stderr.write(f"\n❌ ERROR reading file: {e}\n")
+        logger.error(f"ERROR reading file: {e}")
         return []
 
     tree_lines = []
@@ -32,7 +34,8 @@ def extract_tree_block(file_path):
 
 def extract_file_contents(file_path):
     try:
-        with open(file_path, 'r', encoding='utf-8') as f: lines = f.readlines()
+        with open(file_path, 'r', encoding='utf-8') as f: 
+            lines = f.readlines()
     except Exception:
         return {}
         
@@ -43,7 +46,8 @@ def extract_file_contents(file_path):
     
     for line in lines:
         if line.startswith('### FILE: '):
-            current_file = line.replace('### FILE: ', '').strip().replace('\\', '/')
+            raw_path = line.replace('### FILE: ', '').strip()
+            current_file = PureWindowsPath(raw_path).as_posix()
             current_content = []
             in_code_block = False
             continue
@@ -65,12 +69,12 @@ def extract_file_contents(file_path):
 
 def handle_path_error(path_str):
     path = Path(path_str).resolve()
-    print(f"\n❌ ERROR: The path '{path_str}' is not a valid directory.")
+    logger.error(f"The path '{path_str}' is not a valid directory.")
     if path.is_file():
-        print(f"📄 It looks like this is a FILE, but I need a FOLDER.")
-        print(f"👉 Did you mean the parent folder: {path.parent} ?")
+        logger.info(f"📄 It looks like this is a FILE, but I need a FOLDER.")
+        logger.info(f"👉 Did you mean the parent folder: {path.parent} ?")
     elif not path.exists():
-        print(f"🔍 The directory does not exist. Please check the path.")
+        logger.info(f"🔍 The directory does not exist. Please check the path.")
     sys.exit(1)
 
 def clean_text_for_image(text):
@@ -82,45 +86,50 @@ def get_best_font(font_size=18):
     try:
         from PIL import ImageFont # type: ignore
     except ImportError:
+        logger.error("Pillow library is missing. Image export disabled.")
         return None
 
     system = platform.system()
-    if system == "Darwin":
-        font_paths = ["PingFang.ttc", "Hiragino Sans GB.ttc", "Arial Unicode.ttf", "Menlo.ttc"]
-    elif system == "Windows":
-        font_paths = ["msyh.ttc", "simhei.ttf", "simsun.ttc", "consola.ttf"]
-    else:
-        font_paths = ["NotoSansCJK-Regular.ttc", "wqy-microhei.ttc", "DejaVuSansMono.ttf"]
-        
-    for font_name in font_paths:
+    paths = {
+        "Darwin": ["/System/Library/Fonts/Cache/PingFang.ttc", "Arial Unicode.ttf", "Menlo.ttc"],
+        "Windows": ["C:\\Windows\\Fonts\\msyh.ttc", "simsun.ttc", "consola.ttf"],
+        "Linux": [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/wenquanyi/wqy-microhei/wqy-microhei.ttc",
+            "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc"
+        ]
+    }
+    
+    for font_name in paths.get(system, []):
         try:
             return ImageFont.truetype(font_name, font_size)
-        except IOError:
-            continue
+        except IOError: continue
+            
+    logger.warning("No system fonts found. Falling back to Pillow default (Limited CJK support).")
     return ImageFont.load_default()
 
 def create_image_from_text(text, output_file, line_count):
     if line_count > 1500:
-        print(f"\n⚠️ WARNING: Directory too large ({line_count} lines). Generating an image may cause memory overflow.")
+        logger.warning(f"Directory too large ({line_count} lines). Generating an image may cause memory overflow.")
         return False
 
     try:
         from PIL import Image, ImageDraw, ImageFont # type: ignore
     except ImportError:
-        print("\n❌ ERROR: Exporting as image requires the Pillow library (pip install Pillow).")
+        logger.error("Exporting as image requires the Pillow library. Try: pip install Pillow")
         return False
     
     clean_text = clean_text_for_image(text)
     font_size = 18
     font = get_best_font(font_size)
     if font is None:
-        font = ImageFont.load_default()
+        return False
 
     lines = clean_text.split('\n')
     dummy_img = Image.new('RGB', (1, 1))
     draw = ImageDraw.Draw(dummy_img)
     
-    max_width, total_height = 0, 0
+    max_width = 0
     line_heights = []
     
     for line in lines:
@@ -156,10 +165,10 @@ def create_image_from_text(text, output_file, line_count):
             sys.stdout.write(f"\r🎨 Rendering Image: [{bar}] {percent}% ")
             sys.stdout.flush()
             
-    print()
+    print() 
     try:
         image.save(output_file)
         return True
     except Exception as e:
-        print(f"\n❌ ERROR saving image: {e}")
+        logger.error(f"Failed to save image: {e}")
         return False

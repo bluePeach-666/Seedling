@@ -1,4 +1,4 @@
-# 🌲 Seedling (v2.2.1)
+# 🌲 Seedling (v2.2.2)
 
 [![Seedling CI](https://img.shields.io/github/actions/workflow/status/bbpeaches/Seedling/ci.yml?branch=main&style=flat-square)](https://github.com/bbpeaches/Seedling/actions)
 [![PyPI version](https://img.shields.io/pypi/v/seedling-tools.svg?style=flat-square&color=blue)](https://pypi.org/project/Seedling-tools/)
@@ -12,13 +12,12 @@
 ## 🚀 Key Features
 
 * **Modular Architecture**: A completely rebuilt core engine, separating commands and core logic for infinite scaling and professional maintenance.
-* **Public Python API (Quiet Mode) [NEW]**: Seedling is now a library! You can `import seedling` in your scripts to use its powerful scanning and building engines programmatically, now with a silent `quiet=True` mode for clean server logs.
-* **Context Rehydration 🌟**: Generate a project snapshot using `scan --full`, and use `build` to flawlessly restore the *entire* directory structure along with the original source code.
-* **Smart Text Filter (`--text`)**: Strictly ignore binary and media files during tree scanning and searching. Intelligently whitelists extension-less files (Makefile, Dockerfile) and hidden dotfiles.
-* **C++/CUDA Ecosystem Support [NEW]**: Deeply integrated support for low-level system files (`.cc`, `.cxx`, `.hpp`, `.cu`, `.cuh`, `.cs`) ensuring zero code loss during context aggregation.
-* **Dangerous Deletion (`--delete`)**: Search for files or folders and permanently wipe them out with a built-in safety lock.
+* **Auto OOM Protection [NEW]**: Intelligently probes your host's physical RAM. The `--full` context aggregator enforces a strict 10% memory ceiling, preventing system crashes when parsing massive monorepos.
+* **Cross-Platform Rehydration [NEW]**: Generate a project snapshot on Windows (with `\` paths), and flawlessly restore the *entire* directory structure and source code on a Mac or Linux machine.
+* **Public Python API (True Quiet Mode)**: Seedling is a library! You can `import seedling` in your scripts to use its powerful engines programmatically. With the new centralized logger, `quiet=True` ensures absolute zero stdout pollution.
+* **Smart Text Filter (`--text`)**: Strictly ignore binary and media files during tree scanning. Features a **Heuristic Binary Check** that peeks at file headers to dynamically block disguised non-text files.
+* **Dangerous Deletion (`--delete`)**: Search for files or folders and permanently wipe them out with a built-in TTY interactive lock requiring explicit confirmation.
 * **Scan & Export**: Export directory trees to `Markdown`, `Plain Text`, or high-fidelity `PNG` images with full Chinese character support and automatic trailing slashes for directories.
-* **Reverse Scaffolding**: Use the `build` command to read any tree diagram (even those copied from a README) and instantly recreate the folder/file hierarchy.
 
 ---
 
@@ -48,7 +47,7 @@ You can now use Seedling's core features directly in your Python code:
 ```python
 import seedling
 
-# Generate directory tree lines (Use quiet=True to suppress CLI output)
+# Generate directory tree lines (Use quiet=True to suppress all console logs)
 lines = seedling.scan_dir_lines("./src", max_depth=2, quiet=True)
 print("\n".join(lines))
 
@@ -63,7 +62,7 @@ seedling.build_structure_from_file("blueprint.md", "./new_project")
 
 ## 📖 CLI Reference
 
-Seedling 2.2.1 uses a clean, explicit argument system. All ambiguous short flags have been removed to ensure readability.
+Seedling 2.2.2 uses a clean, explicit argument system. All commands now support unified logging controls (`-v` / `-q`).
 
 ### 1. `scan` - The Explorer
 
@@ -73,16 +72,18 @@ Used for scanning directories or searching for items.
 | --- | --- |
 | `target` | Target directory for scanning or searching (Defaults to `.`). |
 | `--version` | Show program's version number and exit. |
-| `--find` | **Search Mode**. Returns exact and fuzzy matches + a saved report. |
-| `--format` | Output format: `md` (default), `txt`, or `image`. |
-| `--name` | Custom output filename. |
-| `--outdir` | Where to save the result. |
+| `--find`, `-f` | **Search Mode**. Returns exact and fuzzy matches + a saved report. |
+| `--format`, `-F` | Output format: `md` (default), `txt`, or `image`. |
+| `--name`, `-n` | Custom output filename. |
+| `--outdir`, `-o` | Where to save the result. |
 | `--show-hidden` | Include hidden files in the scan. |
-| `--depth` | Maximum recursion depth. |
-| `--exclude` | List of files/directories to ignore. |
+| `--depth`, `-d` | Maximum recursion depth. |
+| `--exclude`, `-e` | List of files/directories to ignore. |
 | `--full` | **Power Mode**. Appends the full text content of all scanned source files. |
 | `--text` | **Smart Filter**. Only scan text-based files (ignores binary/media). |
-| `--delete` | **Cleanup Mode**. Permanently delete items matched by `--find`. |
+| `--delete` | **Cleanup Mode**. Permanently delete items matched by `--find` (Interactive TTY only). |
+| `--verbose`, `-v` | Enable debug logging. |
+| `--quiet`, `-q` | Silent mode. Only show critical errors. |
 
 ### 2. `build` - The Architect
 
@@ -93,13 +94,15 @@ Turn a text-based tree into a real file system, or restore a project from a snap
 | `file` | The source tree blueprint file (`.txt` or `.md`). |
 | `target` | Where to build the structure (Defaults to current directory). |
 | `--version` | Show program's version number and exit. |
-| `--direct` | **Direct Mode**. Bypass prompts to instantly create a specific path. |
+| `--direct`, `-d` | **Direct Mode**. Bypass prompts to instantly create a specific path. |
 | `--check` | **Dry-Run**. Simulate the build and report missing/existing items. |
 | `--force` | **Force Mode**. Overwrite existing files without skipping. |
+| `--verbose`, `-v` | Enable debug logging. |
+| `--quiet`, `-q` | Silent mode. Only show critical errors. |
 
 ---
 
-## 📂 Project Structure (v2.2.1)
+## 📂 Project Structure (v2.2.2)
 
 ```text
 Seedling/
@@ -108,9 +111,11 @@ Seedling/
 │   │   ├── scan/              # Scan logic (explorer, search, full)
 │   │   └── build/             # Build logic (architect)
 │   ├── core/                  # Shared Engines
-│   │   ├── ui.py              # Animations & Progress bars
-│   │   ├── io.py              # File R/W & Image rendering
-│   │   └── filesystem.py      # Traversal & Text verification
+│   │   ├── filesystem.py      # Iterative Traversal & Text verification
+│   │   ├── io.py              # File R/W, Paths & Image rendering
+│   │   ├── logger.py          # Centralized CLI Formatter
+│   │   ├── sysinfo.py         # Hardware Probe (RAM & Depth constraints)
+│   │   └── ui.py              # Animations & Progress bars
 │   ├── __init__.py            # Public API & Metadata
 │   └── main.py                # Entry Point Router
 ├── pyproject.toml             # Build configuration
@@ -120,26 +125,26 @@ Seedling/
 
 ---
 
-## 🛡️ Stability & Hardening
+## 🛡️ Stability & Hardening (The Unbreakable Engine)
 
-Seedling is built to be unbreakable. It includes:
+Seedling v2.2.2 has been rewritten from the ground up to survive extreme edge cases:
 
-* **Path Traversal Prevention [NEW]**: Strict `.is_relative_to()` boundary checks during build operations to completely prevent zero-day directory escape attacks.
-* **Memory Protection**: Automatically skips files larger than 2MB during `--full` scans to prevent crashes.
-* **Graceful Interruptions**: `Ctrl+C` safe. It saves your progress even if you stop a scan midway.
-* **Symlink Loop Defense**: Detects and ignores infinite directory loops.
-* **Terminal Safety**: Built-in UTF-8 encodings to prevent Windows terminal startup crashes.
+* **Recursion DoS Prevention**: Directory traversal uses an iterative Stack-DFS (Depth-First Search) with a hard-capped limit of 1000 layers. Seedling will never crash from `RecursionError` on infinitely nested malicious structures.
+* **Pre-Processing Sandbox**: The `build` engine executes a Phase 1 simulation, intercepting and blocking zero-day path traversal attacks (e.g., `../../../`) *before* any disk operations occur.
+* **Smart Encoding Fallback**: Safely reads legacy codebases using an automated fallback chain (`UTF-8 -> GBK -> Big5 -> UTF-16 -> Latin-1`) to prevent corrupted text restoration.
+* **TTY Delete Lock**: The `--delete` operation strictly verifies an interactive terminal and requires explicit `CONFIRM DELETE` typing, protecting CI/CD pipelines from automated destruction.
+* **Symlink Loop Defense**: Detects and cleanly bypasses infinite directory loops.
 
 ---
 
 ## 📜 Changelog
 
-Detailed changes for each release are documented in the [CHANGELOG.md](https://www.google.com/search?q=./CHANGELOG.md) file.
+Detailed changes for each release are documented in the [CHANGELOG.md](CHANGELOG.md) file.
 
-### Latest Update: v2.2.1 (The Sentinel Patch)
+### Latest Update: v2.2.2 (The Unbreakable Engine Update)
 
-* **Security Hotfix**: Patched a critical Path Traversal vulnerability in the build engine.
-* **Windows Fix**: Resolved a fatal `NameError` startup crash affecting Windows users.
-* **API Quiet Mode**: Added `quiet=True` support for clean library integration without CLI pollution.
-* **Expanded Ecosystem**: Full context aggregation support for C/C++, CUDA, and C# files.
-* **Search Robustness**: Fixed a severe fuzzy search bug where identically named files would overwrite each other in the index.
+* **Auto OOM Protection**: Introduced hardware probing (`sysinfo.py`) to restrict file aggregation to 10% of physical RAM, preventing system-wide OOM crashes.
+* **Cross-Platform Magic**: Replaced manual path handling with `PureWindowsPath`, allowing Mac/Linux users to flawlessly restore codebase snapshots generated on Windows machines.
+* **Centralized Logging**: Stripped all raw `print()` statements for a customized `logger.py`, granting true silent execution (`quiet=True`) for API integrations.
+* **Recursion Elimination**: Refactored the core file engine from recursive to iterative stack traversal, making it mathematically immune to stack overflow.
+* **Heuristic Binary Blocking**: The file engine now peeks at the first 1024 bytes of unknown files to intercept and block disguised binaries containing null bytes.
