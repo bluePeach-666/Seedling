@@ -38,7 +38,7 @@ jobs:
     - name: Run Ultimate Test Suite
       shell: bash 
       run: |
-        sed -i 's/\r$//' test_suite.sh
+        perl -pi -e 's/\r$//' test_suite.sh
         
         export PATH="$HOME/.local/bin:$PATH"
         
