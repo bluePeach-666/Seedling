@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.3] - 2026-03-15
+
+### 🛡️ Security & Hardening (The "Ironclad Sandbox" Update)
+- **Symlink Cascade Deletion Fix**: Patched a critical vulnerability in `search --delete` where symbolic links pointing to system directories were followed rather than unlinked, preventing catastrophic data loss.
+- **Path Traversal Sandbox Enhancement**: Upgraded the `is_safe_path` engine. It now resolves virtual/symlinked paths completely before boundary validation, flawlessly intercepting `../../../` escapes even when the target build directory doesn't physically exist yet.
+- **Test Suite Containment**: Hardened `test_suite.sh` by strictly confining all automated destructive operations (`rm -rf`) to a verified `$HOME/tmp/` sandbox, eliminating the risk of accidental root directory wipes.
+
+### 🚀 Core Engine & Parsing (The "Inception" Fix)
+- **Dynamic Markdown Fencing (Fence Collision Fix)**: The `--full` context aggregator now dynamically scans source code for backticks and mathematically calculates the exact fence size needed (e.g., ` ```` ` ) to safely wrap nested markdown files without breaking the blueprint.
+- **Parser "Focus Mode"**: Fixed a severe logic bug where `build` would mistakenly execute fake `### FILE:` directives embedded inside source code (like test scripts). The parser now completely ignores structural commands while inside an active code block.
+- **Magic Number Binary Detection**: Upgraded the `is_binary_content` heuristic probe. It no longer relies solely on null bytes (`\x00`), but now actively checks file signatures (Magic Numbers) to instantly block disguised PNGs, JPEGs, ZIPs, PDFs, and ELFs from polluting the LLM context.
+- **True OOM Protection Calculation**: Fixed a fatal flaw in the hardware memory probe where systems with low RAM were forcefully assigned a 512MB limit, causing kernel OOM kills. The text reader now also strictly calculates the *decoded UTF-8 string size* in memory, rather than relying on the raw disk file size.
+- **Directory Loop / Bind Mount Prevention**: The DFS traversal engine now tracks resolved physical paths (`seen_real_paths`). It instantly detects and blocks infinite file system loops caused by bind mounts or hard link storms, printing a clean `🔄 [Recursion Blocked]` tag.
+
+### ✨ UX, API & Polish
+- **CI/CD Pipeline Compatibility**: The `ask_yes_no` interactive prompt now actively probes for a TTY environment. In non-interactive environments (like GitHub Actions or piped output), it gracefully defaults to "Safe/No" instead of hanging the process infinitely.
+- **Wildcard Exclusion Support**: The `--exclude` flag now fully supports `fnmatch` globs. Users can now easily ignore patterns like `*.pyc`, `__pycache__`, or `*-lock.json`.
+- **Fuzzy Deletion Safety Lock**: Increased the `difflib` search cutoff threshold from 0.4 to 0.6 for higher accuracy. Furthermore, `--delete` now explicitly separates fuzzy matches from exact matches, requiring a secondary explicit `[y/n]` confirmation before purging them.
+- **Image Bomb Interception**: Hard-capped the `image` export format. Directories exceeding 1500 lines will now trigger a hard error and abort instead of attempting to render a gigabyte-sized image that crashes the Pillow library.
+
 ## [2.2.2] - 2026-03-14
 
 ### 🛡️ Security & Safety

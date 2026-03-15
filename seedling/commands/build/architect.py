@@ -6,11 +6,14 @@ from seedling.core.io import extract_tree_block, extract_file_contents
 from seedling.core.logger import logger
 
 def is_safe_path(path, target):
+    target_real = target.resolve()
+    path_real = path.resolve()
+    
     if sys.version_info >= (3, 9):
-        return path.is_relative_to(target)
+        return path_real.is_relative_to(target_real)
     else:
         try:
-            path.relative_to(target)
+            path_real.relative_to(target_real)
             return True
         except ValueError:
             return False

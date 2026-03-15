@@ -1,5 +1,6 @@
 import sys
 import platform
+import re
 from pathlib import Path, PureWindowsPath
 from .logger import logger
 
@@ -43,23 +44,31 @@ def extract_file_contents(file_path):
     current_file = None
     in_code_block = False
     current_content = []
+    current_fence = None  
     
     for line in lines:
-        if line.startswith('### FILE: '):
+        if not in_code_block and line.startswith('### FILE: '):
             raw_path = line.replace('### FILE: ', '').strip()
             current_file = PureWindowsPath(raw_path).as_posix()
             current_content = []
             in_code_block = False
+            current_fence = None
             continue
             
         if current_file:
-            if line.startswith('```') and not in_code_block:
+            stripped_line = line.strip()
+            
+            if stripped_line.startswith('```') and not in_code_block:
                 in_code_block = True
+                match = re.match(r'^`+', stripped_line)
+                current_fence = match.group() if match else '```'
                 continue
-            elif line.startswith('```') and in_code_block:
+                
+            elif in_code_block and stripped_line == current_fence:
                 in_code_block = False
                 file_contents[current_file] = "".join(current_content)
                 current_file = None
+                current_fence = None
                 continue
                 
             if in_code_block:
@@ -110,7 +119,8 @@ def get_best_font(font_size=18):
 
 def create_image_from_text(text, output_file, line_count):
     if line_count > 1500:
-        logger.warning(f"Directory too large ({line_count} lines). Generating an image may cause memory overflow.")
+        logger.error(f"❌ Directory too large ({line_count} lines). Image export aborted to prevent memory overflow.")
+        logger.info("💡 Tip: Try using '--depth' to limit the scan, or export to Markdown/TXT instead.")
         return False
 
     try:

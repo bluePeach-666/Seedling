@@ -5,19 +5,18 @@ def get_system_mem_limit_mb():
     fallback_mb = 512
     try:
         system = platform.system()
+        total_mb = 0
+        
         if system == "Linux":
             with open('/proc/meminfo', 'r') as f:
                 for line in f:
                     if 'MemTotal' in line:
-                        kb = int(line.split()[1])
-                        return max(fallback_mb, int((kb / 1024) * 0.10))
-                        
+                        total_mb = int(line.split()[1]) / 1024
+                        break
         elif system == "Darwin": # macOS
             import subprocess
             out = subprocess.check_output(['sysctl', '-n', 'hw.memsize']).decode('utf-8')
-            bytes_mem = int(out.strip())
-            return max(fallback_mb, int((bytes_mem / (1024 * 1024)) * 0.10))
-            
+            total_mb = int(out.strip()) / (1024 * 1024)
         elif system == "Windows":
             import ctypes
             class MEMORYSTATUSEX(ctypes.Structure):
@@ -34,11 +33,13 @@ def get_system_mem_limit_mb():
                 ]
             stat = MEMORYSTATUSEX()
             stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-            
             windll = getattr(ctypes, "windll", None)
             if windll is not None:
                 windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
-                return max(fallback_mb, int((stat.ullTotalPhys / (1024 * 1024)) * 0.10))
+                total_mb = stat.ullTotalPhys / (1024 * 1024)
+
+        if total_mb > 0:
+            return max(32, int(total_mb * 0.10))
             
     except Exception:
         pass

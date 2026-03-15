@@ -1,4 +1,4 @@
-# 🌲 Seedling (v2.2.2)
+# 🌲 Seedling (v2.2.3)
 
 [![Seedling CI](https://img.shields.io/github/actions/workflow/status/bbpeaches/Seedling/ci.yml?branch=main&style=flat-square)](https://github.com/bbpeaches/Seedling/actions)
 [![PyPI version](https://img.shields.io/pypi/v/seedling-tools.svg?style=flat-square&color=blue)](https://pypi.org/project/Seedling-tools/)
@@ -12,12 +12,12 @@
 ## 🚀 Key Features
 
 * **Modular Architecture**: A completely rebuilt core engine, separating commands and core logic for infinite scaling and professional maintenance.
-* **Auto OOM Protection [NEW]**: Intelligently probes your host's physical RAM. The `--full` context aggregator enforces a strict 10% memory ceiling, preventing system crashes when parsing massive monorepos.
-* **Cross-Platform Rehydration [NEW]**: Generate a project snapshot on Windows (with `\` paths), and flawlessly restore the *entire* directory structure and source code on a Mac or Linux machine.
+* **True OOM Protection**: Intelligently probes your host's physical RAM and calculates precise decoded UTF-8 memory allocation. The `--full` context aggregator enforces a strict 10% memory ceiling, preventing system crashes when parsing massive monorepos.
+* **Cross-Platform Rehydration**: Generate a project snapshot on Windows (with `\` paths), and flawlessly restore the *entire* directory structure and source code on a Mac or Linux machine.
 * **Public Python API (True Quiet Mode)**: Seedling is a library! You can `import seedling` in your scripts to use its powerful engines programmatically. With the new centralized logger, `quiet=True` ensures absolute zero stdout pollution.
-* **Smart Text Filter (`--text`)**: Strictly ignore binary and media files during tree scanning. Features a **Heuristic Binary Check** that peeks at file headers to dynamically block disguised non-text files.
-* **Dangerous Deletion (`--delete`)**: Search for files or folders and permanently wipe them out with a built-in TTY interactive lock requiring explicit confirmation.
-* **Scan & Export**: Export directory trees to `Markdown`, `Plain Text`, or high-fidelity `PNG` images with full Chinese character support and automatic trailing slashes for directories.
+* **Smart Text Filter & Magic Number Check**: Strictly ignore binary and media files during tree scanning. Features an advanced **Heuristic Binary Check** that scans for Magic Numbers (PNG, ELF, ZIP, PDF, etc.) to dynamically block disguised non-text files.
+* **Dangerous Deletion (`--delete`)**: Search for files or folders and permanently wipe them out with a built-in TTY interactive lock requiring explicit confirmation. Now features secondary safety locks for fuzzy matches and symlinks.
+* **CI/CD & Automation Ready**: Built-in TTY detection ensures Seedling will safely default to "No" instead of hanging infinitely when executed in headless server pipelines or piped commands.
 
 ---
 
@@ -62,7 +62,7 @@ seedling.build_structure_from_file("blueprint.md", "./new_project")
 
 ## 📖 CLI Reference
 
-Seedling 2.2.2 uses a clean, explicit argument system. All commands now support unified logging controls (`-v` / `-q`).
+Seedling 2.2.3 uses a clean, explicit argument system. All commands now support unified logging controls (`-v` / `-q`).
 
 ### 1. `scan` - The Explorer
 
@@ -78,7 +78,7 @@ Used for scanning directories or searching for items.
 | `--outdir`, `-o` | Where to save the result. |
 | `--show-hidden` | Include hidden files in the scan. |
 | `--depth`, `-d` | Maximum recursion depth. |
-| `--exclude`, `-e` | List of files/directories to ignore. |
+| `--exclude`, `-e` | List of items to ignore. **Supports globs (e.g., `*.pyc`, `__pycache__`)**. |
 | `--full` | **Power Mode**. Appends the full text content of all scanned source files. |
 | `--text` | **Smart Filter**. Only scan text-based files (ignores binary/media). |
 | `--delete` | **Cleanup Mode**. Permanently delete items matched by `--find` (Interactive TTY only). |
@@ -102,7 +102,7 @@ Turn a text-based tree into a real file system, or restore a project from a snap
 
 ---
 
-## 📂 Project Structure (v2.2.2)
+## 📂 Project Structure (v2.2.3)
 
 ```text
 Seedling/
@@ -111,11 +111,11 @@ Seedling/
 │   │   ├── scan/              # Scan logic (explorer, search, full)
 │   │   └── build/             # Build logic (architect)
 │   ├── core/                  # Shared Engines
-│   │   ├── filesystem.py      # Iterative Traversal & Text verification
-│   │   ├── io.py              # File R/W, Paths & Image rendering
+│   │   ├── filesystem.py      # Iterative Traversal, Text verification & DFS limits
+│   │   ├── io.py              # File R/W, Fence Collision parsing & Image limits
 │   │   ├── logger.py          # Centralized CLI Formatter
-│   │   ├── sysinfo.py         # Hardware Probe (RAM & Depth constraints)
-│   │   └── ui.py              # Animations & Progress bars
+│   │   ├── sysinfo.py         # Hardware Probe (Precise RAM constraints)
+│   │   └── ui.py              # Animations, Progress bars & CI/CD checks
 │   ├── __init__.py            # Public API & Metadata
 │   └── main.py                # Entry Point Router
 ├── pyproject.toml             # Build configuration
@@ -125,15 +125,16 @@ Seedling/
 
 ---
 
-## 🛡️ Stability & Hardening (The Unbreakable Engine)
+## 🛡️ Stability & Hardening (The Ironclad Sandbox)
 
-Seedling v2.2.2 has been rewritten from the ground up to survive extreme edge cases:
+Seedling v2.2.3 has been fortified to survive extreme edge cases and chaotic inputs:
 
-* **Recursion DoS Prevention**: Directory traversal uses an iterative Stack-DFS (Depth-First Search) with a hard-capped limit of 1000 layers. Seedling will never crash from `RecursionError` on infinitely nested malicious structures.
-* **Pre-Processing Sandbox**: The `build` engine executes a Phase 1 simulation, intercepting and blocking zero-day path traversal attacks (e.g., `../../../`) *before* any disk operations occur.
-* **Smart Encoding Fallback**: Safely reads legacy codebases using an automated fallback chain (`UTF-8 -> GBK -> Big5 -> UTF-16 -> Latin-1`) to prevent corrupted text restoration.
-* **TTY Delete Lock**: The `--delete` operation strictly verifies an interactive terminal and requires explicit `CONFIRM DELETE` typing, protecting CI/CD pipelines from automated destruction.
-* **Symlink Loop Defense**: Detects and cleanly bypasses infinite directory loops.
+* **Recursion & Mount Loop Defense**: Directory traversal uses an iterative Stack-DFS tracking resolved physical paths. It mathematically eliminates `RecursionError` and instantly blocks infinite OS-level bind mount or hard link loops.
+* **Markdown Fence Collision Immunity**: The parser calculates dynamic backtick boundaries, allowing Seedling to flawlessly bundle and reconstruct documents containing nested code blocks (like its own source code) without truncation.
+* **Symlink Deletion Safety**: Search and delete operations explicitly sever symbolic links without following them, protecting host systems from catastrophic cascade deletions.
+* **Pre-Processing Sandbox**: The `build` engine executes a Phase 1 simulation resolving virtual paths. It intercepts zero-day path traversal attacks (e.g., `../../../`) *before* any disk operations occur.
+* **Image Bomb Prevention**: Restricts visual exports to a safe 1500-line limit to prevent Pillow rendering crashes.
+* **Smart Encoding Fallback**: Safely reads legacy codebases using an automated fallback chain (`UTF-8 -> GBK -> Big5 -> UTF-16 -> Latin-1`).
 
 ---
 
@@ -141,10 +142,11 @@ Seedling v2.2.2 has been rewritten from the ground up to survive extreme edge ca
 
 Detailed changes for each release are documented in the [CHANGELOG.md](CHANGELOG.md) file.
 
-### Latest Update: v2.2.2 (The Unbreakable Engine Update)
+### Latest Update: v2.2.3 (The Ironclad Sandbox Update)
 
-* **Auto OOM Protection**: Introduced hardware probing (`sysinfo.py`) to restrict file aggregation to 10% of physical RAM, preventing system-wide OOM crashes.
-* **Cross-Platform Magic**: Replaced manual path handling with `PureWindowsPath`, allowing Mac/Linux users to flawlessly restore codebase snapshots generated on Windows machines.
-* **Centralized Logging**: Stripped all raw `print()` statements for a customized `logger.py`, granting true silent execution (`quiet=True`) for API integrations.
-* **Recursion Elimination**: Refactored the core file engine from recursive to iterative stack traversal, making it mathematically immune to stack overflow.
-* **Heuristic Binary Blocking**: The file engine now peeks at the first 1024 bytes of unknown files to intercept and block disguised binaries containing null bytes.
+* **Dynamic Markdown Fencing**: Completely resolved Markdown "Inception" bugs. Seedling now dynamically calculates the necessary backtick fences to safely wrap and restore nested code blocks.
+* **Wildcard Exclusions**: Upgraded `--exclude` to support `fnmatch` globs (e.g., `*.js`, `secret.*`), making filtering vastly more powerful.
+* **Magic Number Detection**: Replaced the basic null-byte check with strict file signature matching (PNG, JPEG, ELF, ZIP, PDF) to definitively block binary files masquerading as text.
+* **CI/CD TTY Enforcement**: The UI engine now actively detects headless pipelines and safely defaults to "No" on destructive prompts to prevent hanging servers.
+* **Symlink & Fuzzy Deletion Locks**: Severely restricted `--delete` to physically unlink symlinks instead of traversing them, and added a secondary confirmation prompt for fuzzy matches.
+* **True Memory Bounds**: Fixed physical RAM calculations to strictly account for UTF-8 decoded string inflation, fully preventing Out-Of-Memory kills on embedded devices.

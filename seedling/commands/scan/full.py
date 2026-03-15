@@ -19,7 +19,17 @@ def run_full(args, target_path):
     for rel_path, content in context_list:
         sections.append(f"### FILE: {rel_path}")
         lang = rel_path.suffix.lstrip('.')
-        sections.append(f"```{lang}\n{content}\n```\n")
+        
+        max_ticks = 2
+        for line in content.split('\n'):
+            stripped = line.strip()
+            if stripped.startswith('`'):
+                ticks = len(stripped) - len(stripped.lstrip('`'))
+                if ticks > max_ticks:
+                    max_ticks = ticks
+        
+        fence = '`' * (max_ticks + 1)
+        sections.append(f"{fence}{lang}\n{content}\n{fence}\n")
         
     logger.info(f"✅ Aggregated {len(context_list)} files.")
     return "\n".join(sections)

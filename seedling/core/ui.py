@@ -5,6 +5,7 @@ import time
 import random
 import io
 from pathlib import Path
+from seedling.core.logger import logger
 
 # UI configurations
 UI_CONFIG = {
@@ -37,14 +38,22 @@ def ensure_utf8_output():
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-def ask_yes_no(prompt_text):
+def ask_yes_no(prompt_text, default_no=True):
+    if not sys.stdin.isatty():
+        logger.warning("\n ⚠️  Non-interactive terminal detected: defaulting to 'no' to prevent blocking.")
+        return False if default_no else True
+
     while True:
-        ans = input(prompt_text).strip().lower()
-        if ans in ['y', 'yes']:
-            return True
-        if ans in ['n', 'no']:
+        try:
+            ans = input(prompt_text).strip().lower()
+            if ans in ['y', 'yes']:
+                return True
+            if ans in ['n', 'no']:
+                return False
+            print("⚠️  Invalid input. Please enter 'y' or 'n'.")
+        except EOFError:
+            logger.warning("\n ⚠️  Input stream closed (EOF): defaulting to 'no'.")
             return False
-        print("⚠️  Invalid input. Please enter 'y' or 'n'.")
 
 def print_progress_bar(count, label="Processing", icon="⏳"):
     pulse = ["#---", "-#--", "--#-", "---#", "--#-", "-#--"]

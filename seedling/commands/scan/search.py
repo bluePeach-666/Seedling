@@ -33,12 +33,35 @@ def run_search(args, target_path):
             logger.error("Dangerous operation '--delete' can only be used in an interactive terminal.")
             return
 
+        if fuzzy:
+            logger.warning(f"\n⚠️  Fuzzy matches may include unintended items!")
+            logger.info("Fuzzy matches staged for deletion:")
+            for item in fuzzy:
+                logger.info(f"  - {item.relative_to(target_path)}")
+                
+            if not ask_yes_no("👉 Do you want to INCLUDE these fuzzy matches in the deletion? [y/n]: "):
+                logger.info("✅ Fuzzy matches removed from the deletion queue.")
+                fuzzy = []
+                all_matches = exact  
+                
+        if not all_matches:
+            logger.info("\n⏭️ No items left to delete. Aborting.")
+            return
+        
         logger.warning(f"\nCRITICAL WARNING: You are about to PERMANENTLY DELETE {len(all_matches)} items.")
         confirm = input(f"👉 Please type 'CONFIRM DELETE' to proceed: ").strip()
         
         if confirm == "CONFIRM DELETE":
             deleted_count = 0
             for item in all_matches:
+                if item.is_symlink():
+                    try:
+                        item.unlink()
+                        deleted_count += 1
+                        logger.info(f" 🗑️ Deleted (Symlink): {item.relative_to(target_path)}")
+                    except Exception as e:
+                        logger.error(f" Failed to delete symlink {item.relative_to(target_path)}: {e}")
+                    continue
                 if not item.exists():
                     continue
                 try:
@@ -51,9 +74,6 @@ def run_search(args, target_path):
                 except Exception as e:
                     logger.error(f" Failed to delete {item.relative_to(target_path)}: {e}")
             logger.info(f"\n✅ Successfully deleted {deleted_count} items. Operation complete.")
-            return 
-        else:
-            logger.info("\n⏭️ Deletion aborted. No changes were made.")
             return
 
     append_full = False

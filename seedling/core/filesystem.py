@@ -1,5 +1,6 @@
 import sys
 import difflib
+import fnmatch
 from pathlib import Path
 from .ui import print_progress_bar
 from .logger import logger 
@@ -31,7 +32,18 @@ def is_binary_content(file_path):
     try:
         with open(file_path, 'rb') as f:
             chunk = f.read(1024)
-            if b'\x00' in chunk:
+            # Magic Numbers
+            binary_signatures = [
+                b'\x89PNG', b'GIF89a', b'GIF87a',  # PNG, GIF
+                b'\xff\xd8\xff', b'JFIF', b'Exif', # JPEG
+                b'MZ',                             # exe, dll
+                b'\x7fELF',                        # so, bin
+                b'PK\x03\x04',                     # ar, docx, xlsx 
+                b'%PDF-',                          # PDF 
+                b'Rar!\x1a\x07',                   # RAR 
+                b'\x1f\x8b\x08',                   # tar.gz
+            ]
+            if b'\x00' in chunk or any(chunk.startswith(sig) for sig in binary_signatures):
                 return True
     except Exception:
         return True 
@@ -40,8 +52,9 @@ def is_binary_content(file_path):
 def is_valid_item(item, show_hidden, excludes, text_only):
     if not show_hidden and item.name.startswith('.'): 
         return False
-    if item.name in excludes: 
-        return False
+    for pattern in excludes:
+        if fnmatch.fnmatch(item.name, pattern):
+            return False         
     if text_only and item.is_file() and not is_text_file(item): 
         return False
     return True
@@ -70,6 +83,11 @@ def scan_dir_lines(dir_path, prefix="", max_depth=None, current_depth=0, show_hi
         
     lines = []
     path = Path(dir_path)
+    seen_real_paths = set()
+    try:
+        seen_real_paths.add(path.resolve(strict=True))
+    except FileNotFoundError:
+        pass
 
     def get_valid_children(p):
         valid_items = [
@@ -115,7 +133,17 @@ def scan_dir_lines(dir_path, prefix="", max_depth=None, current_depth=0, show_hi
         if item.is_dir() and not item.is_symlink():
             if max_depth is not None and depth > max_depth:
                 continue  
-                
+            
+            try:
+                real_path = item.resolve(strict=True)
+                if real_path in seen_real_paths:
+                    if not quiet:
+                        lines.append(f"{curr_prefix}    └── 🔄 [Recursion Blocked - Directory Loop Detected]")
+                    continue  
+                seen_real_paths.add(real_path)
+            except Exception:
+                pass
+
             try:
                 children = get_valid_children(item)
             except PermissionError:
@@ -173,7 +201,7 @@ def search_items(dir_path, keyword, show_hidden=False, excludes=None, text_only=
 
     exact_match_paths = {ex.resolve() for ex in exact_matches}
     unique_names_for_fuzzy = list(set([name for name, path in all_names_with_path if path.resolve() not in exact_match_paths]))
-    close_names = difflib.get_close_matches(keyword, unique_names_for_fuzzy, n=10, cutoff=0.4)
+    close_names = difflib.get_close_matches(keyword, unique_names_for_fuzzy, n=10, cutoff=0.8)
     close_names_set = set(close_names)
 
     fuzzy_matches = []
@@ -221,8 +249,14 @@ def get_full_context(target_path, show_hidden=False, excludes=None, text_only=Fa
 
                         content = safe_read_text(item, quiet=quiet)
                         if content is not None:
+                            content_size = len(content.encode('utf-8'))
+                            
+                            if current_total_memory + content_size > TOTAL_MAX_MEMORY:
+                                logger.error(f"Hardware memory safety limit ({dynamic_mem_limit_mb}MB) reached after text decoding! Aborting further reads.")
+                                return context_data
+                                
                             context_data.append((item.relative_to(target_path), content))
-                            current_total_memory += f_stat.st_size
+                            current_total_memory += content_size  
                     except Exception: pass
                 elif item.is_dir() and not item.is_symlink():
                     stack.append((item, current_depth + 1))

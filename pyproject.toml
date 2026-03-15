@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Seedling-tools"
-version = "2.2.2"
+version = "2.2.3"
 description = "A modular 3-in-1 CLI toolkit to explore, search, and reconstruct directory structures with LLM-ready context support."
 readme = "README.md"
 authors = [
