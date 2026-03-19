@@ -1,4 +1,4 @@
-# 🌲 Seedling (v2.3.0)
+# 🌲 Seedling (v2.3.1)
 
 [![Seedling CI](https://img.shields.io/github/actions/workflow/status/bbpeaches/Seedling/ci.yml?branch=main&style=flat-square)](https://github.com/bbpeaches/Seedling/actions)
 [![PyPI version](https://img.shields.io/pypi/v/seedling-tools.svg?style=flat-square&color=blue)](https://pypi.org/project/Seedling-tools/)
@@ -7,24 +7,16 @@
 
 **Seedling** is a high-performance, 3-in-1 CLI toolkit designed for developers to explore, search, and reconstruct directory structures. Whether you need a beautiful image of your project architecture, a way to spawn a project from a text blueprint, or a context-optimized codebase skeleton for LLMs, Seedling has you covered.
 
----
-
-## 🚀 Key Features
-
-* **LLM-Optimized Code Skeletons (`--skeleton`)**: Harnesses Python's AST (Abstract Syntax Tree) to strip away complex logic while perfectly preserving classes, functions, and docstrings. Instantly generate a "birds-eye view" of your codebase that drastically saves LLM context window tokens.
-* **Smart Exclusions**: The `--exclude` flag is now context-aware! Pass a file like `.gitignore` and Seedling will automatically read and apply its rules line-by-line. Features intelligent typo-detection and interactive prompts.
-* **Streamlined Search & True Power Mode**: `find` now directly outputs exact and fuzzy matches to the terminal for blazing-fast navigation. Combine it with `--full` to bypass prompts and instantly generate a comprehensive Markdown report containing the directory tree 🎯 highlights and full source code.
-* **True OOM Protection**: Intelligently probes your host's physical RAM and calculates precise decoded UTF-8 memory allocation. The `--full` context aggregator enforces a strict 10% memory ceiling, preventing system crashes when parsing massive monorepos.
-* **Cross-Platform Rehydration**: Generate a project snapshot on Windows (with `\` paths), and flawlessly restore the *entire* directory structure and source code on a Mac or Linux machine.
-* **Public Python API (True Quiet Mode)**: Seedling is a library! You can `import seedling` in your scripts to use its powerful engines programmatically. With the new centralized logger, `quiet=True` ensures absolute zero stdout pollution.
-* **Smart Text Filter & Magic Number Check**: Strictly ignore binary and media files during tree scanning. Features an advanced **Heuristic Binary Check** that scans for Magic Numbers (PNG, ELF, ZIP, PDF, etc.) to dynamically block disguised non-text files.
-* **Dangerous Deletion (`--delete`)**: Search for files or folders and permanently wipe them out with a built-in TTY interactive lock requiring explicit confirmation. Now features secondary safety locks for fuzzy matches and symlinks.
+Read this document in other languages: [简体中文](docs/README_zh.md)
 
 ---
 
 ## 🛠️ Installation
 
 Seedling is designed to be installed globally via `pipx` for a clean, isolated environment.
+```
+pipx install Seedling-tools
+```
 
 ### One-Click Setup
 
@@ -43,19 +35,24 @@ pipx install -e . --force
 
 ## 🐍 Python Library Usage
 
-You can now use Seedling's core features directly in your Python code:
+You can now use Seedling's core features directly in your Python code via the `ScanConfig` engine:
 
 ```python
 import seedling
+from seedling.core.filesystem import ScanConfig
 
-# Generate directory tree lines (Use quiet=True to suppress all console logs)
-lines = seedling.scan_dir_lines("./src", max_depth=2, quiet=True)
+# 1. Initialize configuration (Set quiet=True to suppress CLI progress bars)
+config = ScanConfig(max_depth=2, quiet=True)
+
+# 2. Generate directory tree lines
+stats = {"dirs": 0, "files": 0}
+lines = seedling.scan_dir_lines("./src", config, stats)
 print("\n".join(lines))
 
-# Search for specific items
-exact, fuzzy = seedling.search_items(".", keyword="utils", quiet=True)
+# 3. Search for specific items programmatically
+exact, fuzzy = seedling.search_items(".", keyword="utils", config=config)
 
-# Reconstruct a project from a blueprint
+# 4. Reconstruct a project from a blueprint
 seedling.build_structure_from_file("blueprint.md", "./new_project")
 ```
 
@@ -63,16 +60,15 @@ seedling.build_structure_from_file("blueprint.md", "./new_project")
 
 ## 📖 CLI Reference
 
-Seedling 2.3.0 uses a clean, explicit argument system. All commands now support unified logging controls (`-v` / `-q`).
+Seedling 2.3.1 uses a clean, explicit argument system. 
 
 ### 1. `scan` - The Explorer
 
-Used for scanning directories, extracting code skeletons, or searching for items.
+Used for scanning directories, extracting code skeletons, or searching for items. Note: `--full` and `--skeleton` are mutually exclusive.
 
 | Argument | Description |
 | --- | --- |
 | `target` | Target directory for scanning or searching (Defaults to `.`). |
-| `--version` | Show program's version number and exit. |
 | `--find`, `-f` | **Search Mode**. Fast CLI search (Exact & Fuzzy). Combine with `--full` to export a code report. |
 | `--format`, `-F` | Output format: `md` (default), `txt`, or `image`. |
 | `--name`, `-n` | Custom output filename. |
@@ -81,12 +77,10 @@ Used for scanning directories, extracting code skeletons, or searching for items
 | `--depth`, `-d` | Maximum recursion depth. |
 | `--exclude`, `-e` | List of items to ignore. **Smart parse: auto-reads `.gitignore` files or accepts globs**. |
 | `--full` | **Power Mode**. Appends the full text content of all scanned source files. |
-| `--skeleton` | **[Experimental]** AST Code Skeleton extraction. Strips logic, retains classes/defs/docstrings. |
+| `--skeleton` | **[Experimental]** AST Code Skeleton extraction. Strips logic, retains signatures. |
 | `--text` | **Smart Filter**. Only scan text-based files (ignores binary/media). |
 | `--delete` | **Cleanup Mode**. Permanently delete items matched by `--find` (Interactive TTY only). |
-| `--verbose`, `-v` | Enable debug logging. |
-| `--quiet`, `-q` | Silent mode. Only show critical errors. |
-| `--noemoji` | Disable emojis for cleaner rendering on legacy/simple terminals. |
+| `--verbose` / `-q`| Verbose mode (`-v`) or Quiet mode (`-q`). |
 
 ### 2. `build` - The Architect
 
@@ -96,78 +90,44 @@ Turn a text-based tree into a real file system, or restore a project from a snap
 | --- | --- |
 | `file` | The source tree blueprint file (`.txt` or `.md`). |
 | `target` | Where to build the structure (Defaults to current directory). |
-| `--version` | Show program's version number and exit. |
 | `--direct`, `-d` | **Direct Mode**. Bypass prompts to instantly create a specific path. |
 | `--check` | **Dry-Run**. Simulate the build and report missing/existing items. |
 | `--force` | **Force Mode**. Overwrite existing files without skipping. |
-| `--verbose`, `-v` | Enable debug logging. |
-| `--quiet`, `-q` | Silent mode. Only show critical errors. |
 
 ---
 
-## 📂 Project Structure (v2.3.0)
+## 📂 Project Structure (v2.3.1)
 
 ```text
 Seedling/
+├── docs/                      # Documentation & Changelogs
+│   ├── CHANGELOG.md           # English version history
+│   ├── CHANGELOG_zh.md        # Chinese version history
+│   └── README_zh.md           # Chinese documentation
 ├── seedling/                  # Core Package 
 │   ├── commands/              # CLI Command Routers
 │   │   ├── build/             # Build logic
-│   │   │   ├── __init__.py
-│   │   │   └── architect.py   # Architect engine w/ Path Traversal defense
 │   │   └── scan/              # Scan logic
-│   │       ├── __init__.py
-│   │       ├── exclude.py     # Smart ignore-file parser (v2.3.0)
-│   │       ├── explorer.py    # Standard directory traversal
-│   │       ├── full.py        # Context aggregator
-│   │       ├── search.py      # Overhauled search w/ Power Mode
-│   │       └── skeleton.py    # Python AST skeleton extractor (v2.3.0)
 │   ├── core/                  # Shared Engines
-│   │   ├── __init__.py
-│   │   ├── filesystem.py      # Iterative DFS & Advanced Exclusion rules
-│   │   ├── io.py              # File R/W & Fence Collision parsing
+│   │   ├── filesystem.py      # Iterative DFS, ScanConfig & Filtering
+│   │   ├── io.py              # File R/W, Fence Collision & Path Safety
 │   │   ├── logger.py          # Centralized CLI Formatter
-│   │   ├── sysinfo.py         # Hardware Probe (RAM & Depth limits)
-│   │   └── ui.py              # Animations, Progress bars & CI/CD checks
+│   │   ├── sysinfo.py         # Hardware Probe
+│   │   └── ui.py              # Animations & CI/CD checks
 │   ├── __init__.py            # Public API & Metadata
 │   └── main.py                # CLI Entry Point Router
-├── tests/                     # Unit Tests
-│   ├── __init__.py
-│   ├── test_build_architect.py # Path safety tests
-│   ├── test_core_filesystem.py # Exclusion logic & File type tests
-│   ├── test_core_io.py         # Markdown & Code block parsing tests
-│   ├── test_scan_exclude.py    # Smart ignore-file parsing tests
-│   └── test_scan_skeleton.py   # AST extraction logic tests
-├── CHANGELOG.md               # Version history
+├── tests/                     # Unit Tests (Core, Edge Cases & IO)
 ├── install.bat                # Windows one-click installer
 ├── install.sh                 # Linux/macOS one-click installer
 ├── LICENSE                    # MIT License
 ├── pyproject.toml             # Build configuration & Package metadata
 ├── pytest.ini                 # Pytest configuration file
-├── README.md                  # Project documentation
-└── test_suite.sh              # Ultimate E2E tests
+├── README.md                  # Main documentation
+└── test_suite.sh              # Automated E2E tests
 ```
-
----
-
-## 🛡️ Stability & Hardening (The Ironclad Sandbox)
-
-Seedling v2.3.0 has been fortified to survive extreme edge cases and chaotic inputs:
-
-* **Recursion & Mount Loop Defense**: Directory traversal uses an iterative Stack-DFS tracking resolved physical paths. It mathematically eliminates `RecursionError` and instantly blocks infinite OS-level bind mount or hard link loops.
-* **Markdown Fence Collision Immunity**: The parser calculates dynamic backtick boundaries, allowing Seedling to flawlessly bundle and reconstruct documents containing nested code blocks (like its own source code) without truncation.
-* **AST Graceful Degradation**: The `skeleton` extractor uses Python's `ast` engine. If it encounters syntax errors in legacy/broken code, it safely falls back to returning the raw text rather than crashing the pipeline.
-* **Symlink Deletion Safety**: Search and delete operations explicitly sever symbolic links without following them, protecting host systems from catastrophic cascade deletions.
-* **Pre-Processing Sandbox**: The `build` engine executes a Phase 1 simulation resolving virtual paths. It intercepts zero-day path traversal attacks (e.g., `../../../`) *before* any disk operations occur.
 
 ---
 
 ## 📜 Changelog
 
-Detailed changes for each release are documented in the [CHANGELOG.md](CHANGELOG.md) file.
-
-### Latest Update: v2.3.0 (The "LLM Context" Update)
-
-* **AST Code Skeleton Extraction (`--skeleton`)**: Introduced a powerful AST parsing engine for Python files. Strips out complex implementation logic while perfectly preserving class structures, function signatures, and docstrings. Drastically reduces LLM context window consumption.
-* **Smart Rule File Parsing (`--exclude`)**: The `-e` flag is now context-aware. Passing a file (like `.gitignore`) will automatically read and parse its contents line-by-line. Includes intelligent typo detection (e.g., typing `gitignore` without the dot) and interactive prompts.
-* **Streamlined CLI Search**: The `scan -f` command now prints exact and fuzzy matches directly to the terminal and exits, keeping your disk clean.
-* **True Power Mode for Search**: Combining `--find` with `--full` now safely bypasses interactive prompts and instantly generates a comprehensive Markdown report pairing the highlighted directory tree with the complete source code of matched files.
+Detailed changes for each release are documented in the [docs/CHANGELOG.md](docs/CHANGELOG.md) file.
