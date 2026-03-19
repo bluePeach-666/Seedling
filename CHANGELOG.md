@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-19
+
+### ✨ New Features (The "LLM Context" Update)
+- **AST Code Skeleton Extraction (`--skeleton`)**: Introduced a powerful AST (Abstract Syntax Tree) parsing engine for Python (`.py`) files. This mode strips out complex implementation logic while perfectly preserving class structures, function signatures, and docstrings. It drastically reduces LLM context window consumption while providing a perfect "birds-eye view" of a codebase.
+- **Smart Rule File Parsing (`--exclude`)**: The `-e` flag is now context-aware. Passing a file (like `.gitignore` or `.dockerignore`) will automatically read and parse its contents line-by-line as exclusion rules. It includes smart fallbacks, typo detection (e.g., typing `gitignore` without the dot), and interactive prompts to seamlessly guess the user's intent without needing any additional flags.
+
+### 🚀 UX & CLI Polish
+- **Streamlined CLI Search**: The `scan -f` (find) command has been overhauled for speed and cleanliness. By default, it now prints exact and fuzzy matches directly to the terminal and exits, keeping your disk clean of unwanted report files.
+- **True Power Mode for Search**: When appending `--full` to a search query, Seedling now safely bypasses interactive prompts and instantly generates a comprehensive Markdown report. This report perfectly pairs the 🎯 highlighted directory tree with the complete source code of all matched files.
+
+### 🐛 Bug Fixes & Refactoring
+- **Search Report Fence Collision Fix**: Ported the dynamic backtick calculation algorithm from the main explorer into the search report engine. Extracting source files that contain nested markdown blocks will no longer truncate or break the generated search report.
+- **Parser Decoupling**: Extracted the complex exclusion logic into a dedicated `exclude_parser.py` module, keeping the core CLI router perfectly clean and maintainable.
+
 ## [2.2.3] - 2026-03-15
 
 ### 🛡️ Security & Hardening (The "Ironclad Sandbox" Update)

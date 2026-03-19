@@ -12,9 +12,9 @@ HARD_DEPTH_LIMIT = min(get_system_depth_limit(), MAX_ITERATION_DEPTH)
 
 SPECIAL_TEXT_NAMES = {'makefile', 'dockerfile', 'license', 'caddyfile', 'procfile'}
 TEXT_EXTENSIONS = {
-    '.c', '.h', '.cpp', '.cc', '.cxx', '.c++', '.cp',          
+    '.c', '.h', '.cpp', '.cc', '.cxx', '.c++', '.cp',         
     '.hpp', '.hxx', '.h++', '.hh', '.inc', '.inl', 
-    '.cu', '.cuh',                                             
+    '.cu', '.cuh',                                           
     '.py', '.js', '.ts', '.java', '.go', '.rs', '.cs',
     '.html', '.css', '.md', '.txt', 
     '.json', '.yaml', '.yml', '.toml', '.xml', 
@@ -36,12 +36,12 @@ def is_binary_content(file_path):
             binary_signatures = [
                 b'\x89PNG', b'GIF89a', b'GIF87a',  # PNG, GIF
                 b'\xff\xd8\xff', b'JFIF', b'Exif', # JPEG
-                b'MZ',                             # exe, dll
-                b'\x7fELF',                        # so, bin
-                b'PK\x03\x04',                     # ar, docx, xlsx 
-                b'%PDF-',                          # PDF 
-                b'Rar!\x1a\x07',                   # RAR 
-                b'\x1f\x8b\x08',                   # tar.gz
+                b'MZ',                              # exe, dll
+                b'\x7fELF',                         # so, bin
+                b'PK\x03\x04',                      # ar, docx, xlsx 
+                b'%PDF-',                           # PDF 
+                b'Rar!\x1a\x07',                    # RAR 
+                b'\x1f\x8b\x08',                    # tar.gz
             ]
             if b'\x00' in chunk or any(chunk.startswith(sig) for sig in binary_signatures):
                 return True
@@ -49,12 +49,40 @@ def is_binary_content(file_path):
         return True 
     return False
 
-def is_valid_item(item, show_hidden, excludes, text_only):
+def matches_exclude_pattern(item_path, base_dir, exclude_patterns):
+    """
+    检查文件/目录的相对路径是否匹配排除规则
+    """
+    # 生成相对于扫描根目录的路径（统一为 POSIX 格式）
+    rel_path = item_path.relative_to(base_dir).as_posix()
+    item_name = item_path.name
+    
+    for pattern in exclude_patterns:
+        # 移除尾部斜杠
+        clean_pattern = pattern.rstrip('/')
+        
+        # 文件名直接匹配
+        if fnmatch.fnmatch(item_name, clean_pattern):
+            return True
+        # 相对路径匹配
+        if fnmatch.fnmatch(rel_path, clean_pattern):
+            return True
+        # 递归匹配目录
+        if fnmatch.fnmatch(rel_path, f"*{clean_pattern}") or fnmatch.fnmatch(rel_path, f"*/{clean_pattern}"):
+            return True
+        # 目录规则匹配
+        if pattern.endswith('/') and item_path.is_dir() and (
+            fnmatch.fnmatch(item_name, clean_pattern) or fnmatch.fnmatch(rel_path, clean_pattern)
+        ):
+            return True
+    return False
+
+def is_valid_item(item, base_dir, show_hidden, excludes, text_only):
     if not show_hidden and item.name.startswith('.'): 
         return False
-    for pattern in excludes:
-        if fnmatch.fnmatch(item.name, pattern):
-            return False         
+    # 返回 False 才能真正拦截
+    if matches_exclude_pattern(item, base_dir, excludes):
+        return False
     if text_only and item.is_file() and not is_text_file(item): 
         return False
     return True
@@ -83,16 +111,18 @@ def scan_dir_lines(dir_path, prefix="", max_depth=None, current_depth=0, show_hi
         
     lines = []
     path = Path(dir_path)
+    base_dir = path.resolve()  # 扫描的根目录
     seen_real_paths = set()
     try:
-        seen_real_paths.add(path.resolve(strict=True))
+        seen_real_paths.add(base_dir)
     except FileNotFoundError:
         pass
 
     def get_valid_children(p):
         valid_items = [
             item for item in p.iterdir() 
-            if is_valid_item(item, show_hidden, excludes, text_only)
+            # 优雅的过滤写法
+            if is_valid_item(item, base_dir, show_hidden, excludes, text_only)
         ]
         valid_items.sort(key=lambda x: (not x.is_dir(), x.name.lower()))
         return valid_items
@@ -168,6 +198,7 @@ def search_items(dir_path, keyword, show_hidden=False, excludes=None, text_only=
     all_names_with_path = [] 
     keyword_lower = keyword.lower()
     scan_stats = {"count": 0}  
+    base_dir = Path(dir_path).resolve()  # 扫描的根目录
 
     stack = [Path(dir_path)]
     seen_paths = set() 
@@ -179,14 +210,14 @@ def search_items(dir_path, keyword, show_hidden=False, excludes=None, text_only=
                 if item in seen_paths: continue
                 seen_paths.add(item)
 
-                if not is_valid_item(item, show_hidden, excludes, text_only):
+                if not is_valid_item(item, base_dir, show_hidden, excludes, text_only):
                     continue
 
                 scan_stats["count"] += 1
-                all_names_with_path.append((item.name, item))            
+                all_names_with_path.append((item.name, item))        
 
                 if keyword_lower in item.name.lower():
-                    exact_matches.append(item)         
+                    exact_matches.append(item)        
 
                 if not quiet and scan_stats["count"] % 10 == 0:
                     print_progress_bar(scan_stats["count"], label="Searching", icon="🔍")
@@ -222,6 +253,7 @@ def get_full_context(target_path, show_hidden=False, excludes=None, text_only=Fa
     dynamic_mem_limit_mb = get_system_mem_limit_mb()
     TOTAL_MAX_MEMORY = dynamic_mem_limit_mb * 1024 * 1024
     current_total_memory = 0
+    base_dir = Path(target_path).resolve()  # 扫描的根目录
     
     stack = [(Path(target_path), 0)]
     
@@ -235,7 +267,7 @@ def get_full_context(target_path, show_hidden=False, excludes=None, text_only=Fa
         try:
             items = sorted(list(current_path.iterdir()), key=lambda x: (not x.is_dir(), x.name.lower()))
             for item in items:
-                if not is_valid_item(item, show_hidden, excludes, text_only): 
+                if not is_valid_item(item, base_dir, show_hidden, excludes, text_only): 
                     continue
                     
                 if item.is_file():
@@ -261,5 +293,5 @@ def get_full_context(target_path, show_hidden=False, excludes=None, text_only=Fa
                 elif item.is_dir() and not item.is_symlink():
                     stack.append((item, current_depth + 1))
         except PermissionError: pass
-            
+        
     return context_data

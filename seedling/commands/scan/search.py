@@ -6,6 +6,7 @@ from seedling.core.logger import logger
 from seedling.core.filesystem import search_items, scan_dir_lines, is_text_file, safe_read_text
 
 def run_search(args, target_path):
+    # 执行搜索
     exact, fuzzy = search_items(target_path, args.find, args.show_hidden, args.exclude, args.text_only, args.quiet)
     all_matches = exact + fuzzy
     
@@ -14,20 +15,22 @@ def run_search(args, target_path):
         rel = item.relative_to(target_path) if target_path in item.parents else item
         return f"{prefix} {rel}"
 
+    # 终端打印结果
     if exact:
         logger.info(f"\n🎯 Exact matches for '{args.find}':")
-        for item in exact[:20]: logger.info(f" {format_item(item)}")
+        for item in exact[:20]: logger.info(f"  {format_item(item)}")
     else:
         logger.info(f"\n❓ No exact matches found for '{args.find}'.")
 
     if fuzzy:
         logger.info(f"\n💡 Did you mean one of these? (Fuzzy matches):")
-        for item in fuzzy[:10]: logger.info(f" {format_item(item)}")
+        for item in fuzzy[:10]: logger.info(f"  {format_item(item)}")
 
     if not all_matches:
-        logger.error("No matches found. Aborting document generation.")
+        logger.error("No matches found. Aborting.")
         return
 
+    # 危险删除操作逻辑 (--delete)
     if args.delete:
         if not sys.stdin.isatty():
             logger.error("Dangerous operation '--delete' can only be used in an interactive terminal.")
@@ -76,12 +79,13 @@ def run_search(args, target_path):
             logger.info(f"\n✅ Successfully deleted {deleted_count} items. Operation complete.")
             return
 
-    append_full = False
-    if args.full:
-        if ask_yes_no(f"\n🚀 Power Mode triggered! Do you want to append the full source code for these {len(all_matches)} matches? [y/n]: "):
-            append_full = True
-        else:
-            logger.info("Skipping full source code appending.")
+    # 默认情况下，仅输出到 CLI，直接退出
+    if not args.full:
+        logger.info("\n✅ Search complete! (Tip: Use '--full' to generate a report file with full source code context)")
+        return
+
+    # 强制生成包含“目录高亮”和“全部源码”的文件
+    logger.info("\n🚀 Power Mode triggered! Generating search report with full source code...")
 
     out_dir = Path(args.outdir).resolve() if args.outdir else Path.cwd()
     target_name = target_path.name or "root"
@@ -89,11 +93,12 @@ def run_search(args, target_path):
     final_search_file = out_dir / search_filename
 
     if final_search_file.exists():
-            logger.warning(f"NOTICE: Search report already exists:\n   👉 {final_search_file}")
-            if not ask_yes_no("Do you want to overwrite it? [y/n]: "):
-                logger.info("Aborted. No report was generated.")
-                return
+        logger.warning(f"NOTICE: Search report already exists:\n   👉 {final_search_file}")
+        if not ask_yes_no("Do you want to overwrite it? [y/n]: "):
+            logger.info("Aborted. No report was generated.")
+            return
         
+    # 生成高亮的树状图
     highlights = set(all_matches)
     stats = {"dirs": 0, "files": 0}
     lines = scan_dir_lines(
@@ -112,9 +117,11 @@ def run_search(args, target_path):
     
     tree_text = f"{target_path.name}/\n" + "\n".join(lines)
 
+    # 写入最终的 Markdown 报告
     try:
         with open(final_search_file, 'w', encoding='utf-8') as f:
             f.write(f"# Search Results for '{args.find}' in `{target_path}`\n\n")
+            
             f.write("============================================================\n")
             f.write("📁 MATCHED SOURCE FILES (SUMMARY)\n")
             f.write("============================================================\n\n")
@@ -126,18 +133,30 @@ def run_search(args, target_path):
             f.write("============================================================\n\n")
             f.write(f"```text\n{tree_text}\n```\n\n")
             
-            if append_full:
-                f.write("============================================================\n")
-                f.write("📁 MATCHED SOURCE FILES (FULL CONTEXT)\n")
-                f.write("============================================================\n\n")
-                for m in all_matches:
-                    if m.is_file() and is_text_file(m):
-                        content = safe_read_text(m, quiet=True)
-                        if content is not None:
-                            f.write(f"### FILE: {m.relative_to(target_path)}\n")
-                            lang = m.suffix.lstrip('.')
-                            f.write(f"```{lang}\n{content}\n```\n\n")
-                            
-        logger.info(f"\n✅ Full results saved to:\n   👉 {final_search_file}\n")
+            f.write("============================================================\n")
+            f.write("📁 MATCHED SOURCE FILES (FULL CONTEXT)\n")
+            f.write("============================================================\n\n")
+            
+            extracted_files = 0
+            for m in all_matches:
+                if m.is_file() and is_text_file(m):
+                    content = safe_read_text(m, quiet=True)
+                    if content is not None:
+                        extracted_files += 1
+                        f.write(f"### FILE: {m.relative_to(target_path)}\n")
+                        lang = m.suffix.lstrip('.')
+                        
+                        max_ticks = 2
+                        for line in content.split('\n'):
+                            stripped = line.strip()
+                            if stripped.startswith('`'):
+                                ticks = len(stripped) - len(stripped.lstrip('`'))
+                                if ticks > max_ticks:
+                                    max_ticks = ticks
+                        fence = '`' * (max_ticks + 1)
+                        
+                        f.write(f"{fence}{lang}\n{content}\n{fence}\n\n")
+                        
+        logger.info(f"\n✅ Full results ({extracted_files} files with code) saved to:\n   👉 {final_search_file}\n")
     except Exception as e:
         logger.error(f"Failed to save search results: {e}")
