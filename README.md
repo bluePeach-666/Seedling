@@ -109,25 +109,41 @@ Turn a text-based tree into a real file system, or restore a project from a snap
 
 ```text
 Seedling/
-├── seedling/                  # Core Package
+├── seedling/                  # Core Package 
 │   ├── commands/              # CLI Command Routers
-│   │   ├── scan/              # Scan logic
-│   │   │   ├── explorer.py    # Standard directory traversal
-│   │   │   ├── search.py      # Search engine & highlight reports
-│   │   │   ├── full.py        # Context aggregator
-│   │   │   ├── skeleton.py    # Python AST skeleton extractor
-│   │   │   └── exclude_parser.py # Smart ignore-file parser
-│   │   └── build/             # Build logic (architect)
+│   │   ├── build/             # Build logic
+│   │   │   ├── __init__.py
+│   │   │   └── architect.py   # Architect engine w/ Path Traversal defense
+│   │   └── scan/              # Scan logic
+│   │       ├── __init__.py
+│   │       ├── exclude.py     # Smart ignore-file parser (v2.3.0)
+│   │       ├── explorer.py    # Standard directory traversal
+│   │       ├── full.py        # Context aggregator
+│   │       ├── search.py      # Overhauled search w/ Power Mode
+│   │       └── skeleton.py    # Python AST skeleton extractor (v2.3.0)
 │   ├── core/                  # Shared Engines
-│   │   ├── filesystem.py      # Iterative Traversal, Text verification & DFS limits
-│   │   ├── io.py              # File R/W, Fence Collision parsing & Image limits
+│   │   ├── __init__.py
+│   │   ├── filesystem.py      # Iterative DFS & Advanced Exclusion rules
+│   │   ├── io.py              # File R/W & Fence Collision parsing
 │   │   ├── logger.py          # Centralized CLI Formatter
-│   │   ├── sysinfo.py         # Hardware Probe (Precise RAM constraints)
+│   │   ├── sysinfo.py         # Hardware Probe (RAM & Depth limits)
 │   │   └── ui.py              # Animations, Progress bars & CI/CD checks
 │   ├── __init__.py            # Public API & Metadata
-│   └── main.py                # Entry Point Router
-├── pyproject.toml             # Build configuration
-├── install.sh/bat             # One-click installers
+│   └── main.py                # CLI Entry Point Router
+├── tests/                     # Unit Tests
+│   ├── __init__.py
+│   ├── test_build_architect.py # Path safety tests
+│   ├── test_core_filesystem.py # Exclusion logic & File type tests
+│   ├── test_core_io.py         # Markdown & Code block parsing tests
+│   ├── test_scan_exclude.py    # Smart ignore-file parsing tests
+│   └── test_scan_skeleton.py   # AST extraction logic tests
+├── CHANGELOG.md               # Version history
+├── install.bat                # Windows one-click installer
+├── install.sh                 # Linux/macOS one-click installer
+├── LICENSE                    # MIT License
+├── pyproject.toml             # Build configuration & Package metadata
+├── pytest.ini                 # Pytest configuration file
+├── README.md                  # Project documentation
 └── test_suite.sh              # Ultimate E2E tests
 ```
 
