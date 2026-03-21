@@ -23,6 +23,8 @@ def setup_scan_parser(parser):
     parser.add_argument("--showhidden", dest="show_hidden", action="store_true", help="Include hidden files")
     parser.add_argument("--text", dest="text_only", action="store_true", help="Only scan text files (ignore binary/media)")
     parser.add_argument("--delete", action="store_true", help="Delete matched items (FIND MODE ONLY)")
+    parser.add_argument("--dry-run", dest="dry_run", action="store_true",
+                        help="Preview deletions without executing (use with --delete)")
     parser.add_argument("--noemoji", dest="no_emoji", action="store_true", help="Disable emojis for legacy terminals")
 
     # NEW: Include filter
@@ -41,6 +43,8 @@ def setup_scan_parser(parser):
                             help="Search inside file contents")
     grep_group.add_argument("-C", "--context", type=int, default=0,
                             help="Show N lines of context around grep matches")
+    grep_group.add_argument("-i", "--ignore-case", action="store_true",
+                            help="Case-insensitive search (default is case-sensitive)")
 
     # NEW: Analyze mode
     parser.add_argument("--analyze", action="store_true", help="Analyze project structure and dependencies")
@@ -94,6 +98,13 @@ def handle_scan(args):
         return
 
     if args.skeleton:
+        # Check Python version for skeleton mode
+        if sys.version_info < (3, 9):
+            from seedling.core.logger import logger
+            logger.error("Skeleton extraction requires Python 3.9 or higher.")
+            logger.info(f"Current version: Python {sys.version_info.major}.{sys.version_info.minor}")
+            logger.info("Tip: Use 'scan --full' for full source code export instead.")
+            sys.exit(1)
         run_skeleton(args, target_path)
         return
 

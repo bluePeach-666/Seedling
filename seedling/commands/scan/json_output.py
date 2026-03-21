@@ -30,7 +30,7 @@ def _build_node(current: Path, base: Path, config: ScanConfig) -> Dict[str, Any]
     }
 
     if current.is_file():
-        node["extension"] = current.suffix.lower() or None
+        node["extension"] = current.suffix.lower() or None # type: ignore
     elif current.is_dir():
         children = []
         try:
@@ -40,7 +40,7 @@ def _build_node(current: Path, base: Path, config: ScanConfig) -> Dict[str, Any]
                     children.append(_build_node(item, base, config))
         except PermissionError:
             node["error"] = "Permission Denied"
-        node["children"] = children
+        node["children"] = children # type: ignore
 
     return node
 

@@ -1,4 +1,4 @@
-# Seedling (v2.4.0)
+# Seedling (v2.4.1)
 
 [![Seedling CI](https://img.shields.io/github/actions/workflow/status/bbpeaches/Seedling/ci.yml?branch=main&style=flat-square)](https://github.com/bbpeaches/Seedling/actions)
 [![PyPI version](https://img.shields.io/pypi/v/seedling-tools.svg?style=flat-square&color=blue)](https://pypi.org/project/Seedling-tools/)
@@ -60,7 +60,7 @@ seedling.build_structure_from_file("blueprint.md", "./new_project")
 
 ## CLI 命令参考
 
-Seedling 2.4.0 采用清晰、显式的参数系统。
+Seedling 2.4.1 采用清晰、显式的参数系统。
 
 ### 1. `scan` - 探索器
 
@@ -86,6 +86,7 @@ Seedling 2.4.0 采用清晰、显式的参数系统。
 | `--skeleton` | **[实验性]** AST 代码骨架提取。剔除内部逻辑，保留签名。 |
 | `--text` | **智能过滤**。仅扫描文本格式文件 (自动忽略二进制/多媒体文件)。 |
 | `--delete` | **清理模式**。永久删除被 `--find` 匹配到的项目 (仅限交互式 TTY 终端可用)。 |
+| `--dry-run` | **[新增]** 预览删除操作但不实际执行 (配合 `--delete` 使用)。 |
 | `--verbose` / `-q`| 调试日志模式 (`-v`) 或静默模式 (`-q`)。 |
 
 ### 2. `build` - 建造师
@@ -102,7 +103,21 @@ Seedling 2.4.0 采用清晰、显式的参数系统。
 
 -----
 
-## v2.4.0 新功能 - Agent 工具增强
+## v2.4.1 新功能 - 修复与改进
+
+### 安全性
+- **`--dry-run` 模式**：在执行 `--delete` 前预览将要删除的内容：
+  ```bash
+  scan . -f "temp_*" --delete --dry-run
+  ```
+
+### 兼容性
+- **`--skeleton` 需要 Python 3.9+**：为 Python 3.8 用户提供清晰的错误提示
+- **Pillow 改为可选依赖**：仅在需要图片导出时安装 `pip install Seedling-tools[image]`
+
+### 性能
+- **精确内存计算**：修复内存追踪，防止高 Unicode 密度文件导致 OOM 崩溃
+- **保守内存阈值**：降低至 80% 以增加安全余量
 
 ### JSON 输出模式
 导出结构化 JSON 格式的目录结构，便于程序化处理：
@@ -138,7 +153,7 @@ scan . --analyze
 
 -----
 
-## 项目结构 (v2.4.0)
+## 项目结构 (v2.4.1)
 
 ```text
 Seedling/

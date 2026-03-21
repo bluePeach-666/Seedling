@@ -433,3 +433,142 @@ class TestGrepMatch:
         assert match.line_content == "some code"
         assert len(match.context_before) == 2
         assert len(match.context_after) == 2
+
+
+class TestGrepCaseSensitivity:
+    """Test grep case sensitivity control (v2.4.1)."""
+
+    def test_grep_case_sensitive_default(self, tmp_path):
+        """Test default grep is case-sensitive."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def TODO():\n    pass\n")
+
+        config = ScanConfig()
+        matches = grep_files(tmp_path, "todo", config, context=0, ignore_case=False)
+
+        assert len(matches) == 0  # 'todo' should NOT match 'TODO'
+
+    def test_grep_case_insensitive(self, tmp_path):
+        """Test grep with ignore_case=True."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def TODO():\n    pass\n")
+
+        config = ScanConfig()
+        matches = grep_files(tmp_path, "todo", config, context=0, ignore_case=True)
+
+        assert len(matches) == 1  # 'todo' should match 'TODO'
+        assert "TODO" in matches[0].line_content
+
+    def test_grep_case_sensitive_exact_match(self, tmp_path):
+        """Test case-sensitive exact match."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def Todo():\ndef todo():\n")
+
+        config = ScanConfig()
+        matches = grep_files(tmp_path, "todo", config, context=0, ignore_case=False)
+
+        # Should only match lowercase 'todo', not 'Todo'
+        assert len(matches) == 1
+        assert matches[0].line_content == "def todo():"
+
+    def test_grep_regex_with_ignore_case(self, tmp_path):
+        """Test regex mode respects ignore_case."""
+        test_file = tmp_path / "test.py"
+        test_file.write_text("def TODO():\ndef todo():\n")
+
+        config = ScanConfig(use_regex=True)
+        # With case-sensitive, should only match lowercase 'todo'
+        matches = grep_files(tmp_path, r"todo", config, context=0, ignore_case=False)
+        assert len(matches) == 1
+        assert "todo()" in matches[0].line_content
+
+        # With case-insensitive, should match both
+        matches = grep_files(tmp_path, r"todo", config, context=0, ignore_case=True)
+        assert len(matches) == 2
+
+
+class TestScanConfigIgnoreCase:
+    """Test ScanConfig ignore_case field (v2.4.1)."""
+
+    def test_ignore_case_field_default(self):
+        """Test ignore_case field defaults to False."""
+        config = ScanConfig()
+        assert config.ignore_case is False
+
+    def test_ignore_case_field_set(self):
+        """Test ignore_case field can be set."""
+        config = ScanConfig(ignore_case=True)
+        assert config.ignore_case is True
+
+
+class TestTraversalModule:
+    """Test unified traversal module (v2.4.1)."""
+
+    def test_traverse_directory_basic(self, tmp_path):
+        """Test basic directory traversal."""
+        from seedling.core.traversal import traverse_directory, TraversalItem
+
+        (tmp_path / "file1.py").touch()
+        (tmp_path / "subdir").mkdir()
+        (tmp_path / "subdir" / "file2.py").touch()
+
+        config = ScanConfig()
+        result = traverse_directory(tmp_path, config)
+
+        assert len(result.items) == 3  # file1.py, subdir, file2.py
+        assert result.stats["files"] == 2
+        assert result.stats["dirs"] == 1
+
+    def test_traversal_result_text_files(self, tmp_path):
+        """Test TraversalResult.text_files list."""
+        from seedling.core.traversal import traverse_directory
+
+        (tmp_path / "code.py").touch()
+        (tmp_path / "data.json").touch()
+        (tmp_path / "image.png").touch()
+
+        config = ScanConfig()
+        result = traverse_directory(tmp_path, config)
+
+        # Should only include text files
+        text_names = {item.path.name for item in result.text_files}
+        assert "code.py" in text_names
+        assert "data.json" in text_names
+        assert "image.png" not in text_names
+
+    def test_traversal_content_cache(self, tmp_path):
+        """Test content caching in traversal."""
+        from seedling.core.traversal import traverse_directory
+
+        test_file = tmp_path / "test.py"
+        test_file.write_text("print('hello')")
+
+        config = ScanConfig()
+        result = traverse_directory(tmp_path, config, collect_content=True)
+
+        # Find the item and check cached content
+        for item in result.text_files:
+            if item.path.name == "test.py":
+                content = result.get_content(item, quiet=True)
+                assert content == "print('hello')"
+                break
+        else:
+            assert False, "test.py not found in text_files"
+
+    def test_traversal_respects_depth_limit(self, tmp_path):
+        """Test traversal respects max_depth."""
+        from seedling.core.traversal import traverse_directory
+
+        # Create nested structure
+        (tmp_path / "l1").mkdir()
+        (tmp_path / "l1" / "l2").mkdir()
+        (tmp_path / "l1" / "l2" / "l3").mkdir()
+        (tmp_path / "l1" / "l2" / "l3" / "deep.txt").touch()
+
+        config = ScanConfig(max_depth=2)
+        result = traverse_directory(tmp_path, config)
+
+        # Should not include l3 or deep.txt
+        all_paths = [item.path.name for item in result.items]
+        assert "l3" not in all_paths
+        assert "deep.txt" not in all_paths

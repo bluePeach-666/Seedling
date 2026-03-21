@@ -119,6 +119,7 @@ def clean_text_for_image(text):
     return cleaned
 
 def get_best_font(font_size=18):
+    """Get best available font with enhanced Linux and CJK support."""
     try:
         from PIL import ImageFont # type: ignore
     except ImportError:
@@ -126,23 +127,123 @@ def get_best_font(font_size=18):
         return None
 
     system = platform.system()
-    paths = {
-        "Darwin": ["/System/Library/Fonts/Cache/PingFang.ttc", "Arial Unicode.ttf", "Menlo.ttc"],
-        "Windows": ["C:\\Windows\\Fonts\\msyh.ttc", "simsun.ttc", "consola.ttf"],
+
+    # Expanded font paths with priority order (CJK-capable fonts first)
+    font_paths = {
+        "Darwin": [
+            # CJK primary fonts
+            "/System/Library/Fonts/PingFang.ttc",
+            "/System/Library/Fonts/Cache/PingFang.ttc",
+            "/System/Library/Fonts/STHeiti Light.cjk",
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            # Fallback Unicode fonts
+            "Arial Unicode.ttf",
+            "/Library/Fonts/Arial Unicode.ttf",
+            # Monospace fallback
+            "Menlo.ttc",
+            "/System/Library/Fonts/Menlo.ttc",
+        ],
+        "Windows": [
+            # CJK fonts (Microsoft YaHei, SimHei, SimSun)
+            "C:\\Windows\\Fonts\\msyh.ttc",      # Microsoft YaHei (recommended)
+            "C:\\Windows\\Fonts\\msyhbd.ttc",    # Microsoft YaHei Bold
+            "C:\\Windows\\Fonts\\simhei.ttf",    # SimHei
+            "C:\\Windows\\Fonts\\simsun.ttc",    # SimSun
+            "C:\\Windows\\Fonts\\simkai.ttf",    # KaiTi
+            # Unicode fallback
+            "C:\\Windows\\Fonts\\consola.ttf",   # Consolas
+            "C:\\Windows\\Fonts\\arial.ttf",     # Arial
+        ],
         "Linux": [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+            # Noto CJK fonts (most common on modern distros)
+            "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            # WenQuanYi fonts (popular Chinese fonts)
             "/usr/share/fonts/wenquanyi/wqy-microhei/wqy-microhei.ttc",
-            "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc"
+            "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
+            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+            "/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc",
+            # Source Han fonts (Adobe)
+            "/usr/share/fonts/adobe-source-han-sans/SourceHanSansCN-Regular.otf",
+            "/usr/share/fonts/opentype/source-han-sans/SourceHanSansCN-Regular.otf",
+            "/usr/share/fonts/source-han-sans/SourceHanSansCN-Regular.otf",
+            # Droid/Samsung CJK
+            "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            # DejaVu (fallback for Latin only)
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         ]
     }
-    
-    for font_name in paths.get(system, []):
+
+    # Try hardcoded paths first
+    for font_path in font_paths.get(system, []):
         try:
-            return ImageFont.truetype(font_name, font_size)
-        except IOError: continue
-            
+            return ImageFont.truetype(font_path, font_size)
+        except IOError:
+            continue
+
+    # NEW: Try fontconfig dynamic discovery (Linux only)
+    if system == "Linux":
+        font = _try_fontconfig_discovery(font_size)
+        if font:
+            return font
+
     logger.warning("No system fonts found. Falling back to Pillow default (Limited CJK support).")
     return ImageFont.load_default()
+
+
+def _try_fontconfig_discovery(font_size: int):
+    """
+    Use fontconfig to dynamically discover CJK fonts on Linux.
+    This provides better support for headless servers and custom distros.
+    """
+    try:
+        import subprocess
+
+        # Query fontconfig for CJK-capable fonts (Chinese, Japanese, Korean)
+        result = subprocess.run(
+            ['fc-list', ':lang=zh', 'file'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            # Get first available CJK font
+            for line in result.stdout.strip().split('\n')[:10]:
+                font_path = line.split(':')[0].strip()
+                if font_path:
+                    try:
+                        from PIL import ImageFont # type: ignore
+                        return ImageFont.truetype(font_path, font_size)
+                    except IOError:
+                        continue
+
+        # Fallback: Try to find any monospace or sans font with good Unicode coverage
+        result = subprocess.run(
+            ['fc-list', ':spacing=100', 'file'],  # Monospace fonts
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0 and result.stdout.strip():
+            for line in result.stdout.strip().split('\n')[:5]:
+                font_path = line.split(':')[0].strip()
+                if font_path:
+                    try:
+                        from PIL import ImageFont # type: ignore
+                        return ImageFont.truetype(font_path, font_size)
+                    except IOError:
+                        continue
+
+    except (subprocess.TimeoutExpired, FileNotFoundError, ImportError):
+        pass
+
+    return None
 
 def create_image_from_text(text, output_file, line_count):
     if line_count > 1500:

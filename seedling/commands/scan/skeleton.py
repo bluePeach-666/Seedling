@@ -44,12 +44,20 @@ def extract_skeleton(code: str) -> str:
         logger.warning(f"AST Extraction failed: {e}")
         return code
 
-def run_skeleton(args, target_path):
+def check_skeleton_support() -> bool:
+    """Check if Python version supports skeleton extraction (3.9+)."""
     if not hasattr(ast, "unparse"):
-        logger.error("❌ Skeleton extraction requires Python 3.9 or higher (depends on ast.unparse).")
+        import sys
+        logger.error(f"Skeleton extraction requires Python 3.9+ (current: {sys.version_info.major}.{sys.version_info.minor})")
+        logger.info("Tip: Upgrade Python or use 'scan --full' for full source code export.")
+        return False
+    return True
+
+def run_skeleton(args, target_path):
+    if not check_skeleton_support():
         return
 
-    logger.info(f"\n🦴 Skeleton mode activated! Extracting Python code structure from {target_path}...")
+    logger.info(f"\nSkeleton mode activated! Extracting Python code structure from {target_path}...")
     
     config = ScanConfig(
         max_depth=args.depth,

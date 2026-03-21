@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-03-21
+
+### Architecture Refactoring
+
+This release includes significant architectural improvements and performance optimizations.
+
+### Performance Improvements
+
+- **Single-Pass Traversal Engine**: Introduced unified `traverse_directory()` function with content caching. The `scan -f keyword --full` workflow now uses a single filesystem pass instead of three separate traversals.
+- **Content Caching**: File contents are now cached during traversal, preventing redundant file reads when generating reports.
+
+### Architecture Changes
+
+- **Module Restructuring**: Split `filesystem.py` (368 lines) into focused modules for better maintainability:
+  - `config.py`: Configuration classes and constants
+  - `detection.py`: File type detection utilities
+  - `patterns.py`: Pattern matching functions
+  - `traversal.py`: Unified traversal engine with caching
+- **Backward Compatibility**: All existing imports from `filesystem.py` continue to work via re-exports.
+
+### CLI Improvements
+
+- **Grep Case Sensitivity**: Added `-i` / `--ignore-case` flag for content search. Default is now **case-sensitive** for more predictable behavior.
+  ```bash
+  scan . -g "TODO"              # Case-sensitive (new default)
+  scan . -g "todo" -i           # Case-insensitive
+  ```
+- **Enhanced Font Discovery**: Expanded Linux font path coverage (Noto CJK, WenQuanYi, Source Han, Droid) and added fontconfig dynamic discovery for better CJK support on headless servers.
+
+### Compatibility Fixes
+
+- **Python Version Check for `--skeleton`**: Added early CLI-level version check for `--skeleton` mode which requires Python 3.9+ (depends on `ast.unparse`). Users on Python 3.8 now receive a clear error message with upgrade instructions instead of a crash.
+- **Pillow as Optional Dependency**: Moved `Pillow` from required to optional dependencies (`[project.optional-dependencies] image`). Users who don't need image export no longer need to install Pillow. Install with `pip install Seedling-tools[image]` for image support.
+
+### Security Improvements
+
+- **`--dry-run` Mode for `--delete`**: Added `--dry-run` flag to preview deletions before executing. Shows a detailed list of files/directories that would be deleted without actually performing the deletion.
+  ```bash
+  scan . -f "temp_*" --delete --dry-run
+  ```
+
+### Bug Fixes
+
+- **Accurate Memory Calculation**: Fixed memory limit calculation in `get_full_context()` to use `sys.getsizeof()` instead of UTF-8 encoded size. This provides more accurate memory tracking and prevents OOM crashes when processing files with high Unicode character density.
+- **Conservative Memory Threshold**: Reduced memory threshold from 100% to 80% of system limit for additional safety margin.
+
 ## [2.4.0] - 2026-03-21
 
 ### Agent Tools Enhancement Update

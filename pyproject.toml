@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Seedling-tools"
-version = "2.4.0"
+version = "2.4.1"
 description = "A modular 3-in-1 CLI toolkit to explore, search, and reconstruct directory structures with LLM-ready context support."
 readme = "README.md"
 authors = [
@@ -12,7 +12,7 @@ authors = [
 ]
 requires-python = ">=3.8"
 keywords = [
-    "python", "cli", "productivity", "terminal", "developer-tools", 
+    "python", "cli", "productivity", "terminal", "developer-tools",
     "directory-tree", "scaffolding", "llm", "context-window", "ai-tools"
 ]
 license = {text = "MIT"}
@@ -24,14 +24,16 @@ classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Topic :: Utilities"
 ]
-dependencies = [
-    "Pillow>=9.0.0"
-]
+dependencies = []
 
 [project.optional-dependencies]
+image = [
+    "Pillow>=9.0.0"
+]
 dev = [
     "pytest>=8.0.0",
-    "pytest-cov>=4.0.0"
+    "pytest-cov>=4.0.0",
+    "Pillow>=9.0.0"
 ]
 
 [project.urls]

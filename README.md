@@ -1,4 +1,4 @@
-# Seedling (v2.4.0)
+# Seedling (v2.4.1)
 
 [![Seedling CI](https://img.shields.io/github/actions/workflow/status/bbpeaches/Seedling/ci.yml?branch=main&style=flat-square)](https://github.com/bbpeaches/Seedling/actions)
 [![PyPI version](https://img.shields.io/pypi/v/seedling-tools.svg?style=flat-square&color=blue)](https://pypi.org/project/Seedling-tools/)
@@ -60,7 +60,7 @@ seedling.build_structure_from_file("blueprint.md", "./new_project")
 
 ## CLI Reference
 
-Seedling 2.4.0 uses a clean, explicit argument system.
+Seedling 2.4.1 uses a clean, explicit argument system.
 
 ### 1. `scan` - The Explorer
 
@@ -86,6 +86,7 @@ Used for scanning directories, extracting code skeletons, or searching for items
 | `--skeleton` | **[Experimental]** AST Code Skeleton extraction. Strips logic, retains signatures. |
 | `--text` | **Smart Filter**. Only scan text-based files (ignores binary/media). |
 | `--delete` | **Cleanup Mode**. Permanently delete items matched by `--find` (Interactive TTY only). |
+| `--dry-run` | **[NEW]** Preview deletions without executing (use with `--delete`). |
 | `--verbose` / `-q`| Verbose mode (`-v`) or Quiet mode (`-q`). |
 
 ### 2. `build` - The Architect
@@ -102,7 +103,21 @@ Turn a text-based tree into a real file system, or restore a project from a snap
 
 ---
 
-## New in v2.4.0 - Agent Tools Enhancement
+## New in v2.4.1 - Bug Fixes & Improvements
+
+### Security
+- **`--dry-run` Mode**: Preview deletions before executing with `--delete`:
+  ```bash
+  scan . -f "temp_*" --delete --dry-run
+  ```
+
+### Compatibility
+- **Python 3.9+ Required for `--skeleton`**: Clear error message for Python 3.8 users
+- **Pillow as Optional Dependency**: Install with `pip install Seedling-tools[image]` only if you need image export
+
+### Performance
+- **Accurate Memory Calculation**: Fixed memory tracking to prevent OOM crashes on high-Unicode files
+- **Conservative Memory Threshold**: Reduced to 80% for additional safety
 
 ### JSON Output Mode
 Export directory structures as structured JSON for programmatic consumption:
@@ -138,7 +153,7 @@ scan . --analyze
 
 ---
 
-## Project Structure (v2.4.0)
+## Project Structure (v2.4.1)
 
 ```text
 Seedling/

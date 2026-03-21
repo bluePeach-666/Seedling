@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-# Seedling Ultimate Automated Test Suite (v2.4.0)
+# Seedling Ultimate Automated Test Suite (v2.4.1)
 # ==============================================================================
 
 set -e
@@ -78,8 +78,13 @@ echo -e "  -> Testing SECURITY: Image Memory Bomb Limit..."
 mkdir -p "$TEST_DIR/huge_dir"
 seq 1 1505 | xargs -I {} touch "$TEST_DIR/huge_dir/file_{}.txt"
 OUTPUT=$(scan "$TEST_DIR/huge_dir" -F image -o "$OUT_DIR" -n "huge.png" 2>&1 || true)
-if [[ ! "$OUTPUT" == *"aborted to prevent memory overflow"* ]]; then
-    echo -e "${RED}Image memory bomb check failed!${NC}"; exit 1
+
+if [[ "$OUTPUT" == *"'Pillow' is required"* ]]; then
+    echo -e "${YELLOW}     Skipping Image memory bomb check: Pillow not installed.${NC}"
+elif [[ ! "$OUTPUT" == *"aborted to prevent memory overflow"* ]]; then
+    echo -e "${RED}Image memory bomb check failed! Output was: $OUTPUT${NC}"; exit 1
+else
+    echo "     Image memory bomb intercepted successfully."
 fi
 
 # ==============================================================================
@@ -145,7 +150,7 @@ fi
 # TEST SUITE 3: v2.4.0 New Feature Tests (Agent Tools Enhancement)
 # ==============================================================================
 
-echo -e "\n${GREEN}[3/3] Executing v2.4.0 Agent Tools Enhancement Tests...${NC}"
+echo -e "\n${GREEN}[3/3] Executing v2.4.1 Agent Tools Enhancement Tests...${NC}"
 
 # Prepare test files for v2.4 features
 cat << 'EOF' > "$TEST_DIR/src/config.py"
@@ -258,12 +263,34 @@ if ! grep -q '"contents"' "$OUT_DIR/json_full.json"; then
 fi
 echo "     JSON with --full working."
 
+# Test 10: Grep Case Sensitivity (v2.4.1)
+echo -e "  -> Testing v2.4.1: Grep Case Sensitivity (-i flag)..."
+# Create test file with mixed case
+cat << 'EOF' > "$TEST_DIR/src/case_test.py"
+# Test file for case sensitivity
+def TODO():
+    pass
+def todo():
+    pass
+EOF
+# Case-sensitive (default) - should NOT find TODO when searching for 'todo'
+OUTPUT=$(scan "$TEST_DIR" --grep "todo" --type py 2>&1 || true)
+if [[ "$OUTPUT" == *"TODO()"* ]]; then
+    echo -e "${RED}Case-sensitive grep failed! Should NOT find 'TODO' when searching 'todo'.${NC}"; exit 1
+fi
+# Case-insensitive (with -i) - should find both
+OUTPUT=$(scan "$TEST_DIR" --grep "todo" --type py -i 2>&1 || true)
+if [[ "$OUTPUT" != *"TODO()"* ]]; then
+    echo -e "${RED}Case-insensitive grep failed! Should find 'TODO' with -i flag.${NC}"; exit 1
+fi
+echo "     Grep case sensitivity working."
+
 # ==============================================================================
 # FINAL CLEANUP & SUCCESS
 # ==============================================================================
 
 echo -e "\n${BLUE}======================================================${NC}"
-echo -e "${GREEN}   ALL TESTS PASSED! Seedling v2.4.0 is UNBREAKABLE! ${NC}"
+echo -e "${GREEN}   ALL TESTS PASSED! Seedling v2.4.1 is UNBREAKABLE! ${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
 if [[ "$TEST_DIR" == "$HOME/tmp/"* && "$OUT_DIR" == "$HOME/tmp/"* ]]; then

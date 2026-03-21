@@ -3,7 +3,9 @@ import re
 from pathlib import Path
 from typing import List, Callable
 from dataclasses import dataclass
-from seedling.core.filesystem import ScanConfig, safe_read_text, is_text_file, is_valid_item
+from seedling.core.config import ScanConfig
+from seedling.core.filesystem import safe_read_text, is_text_file
+from seedling.core.patterns import is_valid_item
 from seedling.core.logger import logger
 
 
@@ -18,22 +20,47 @@ class GrepMatch:
     context_after: List[str]
 
 
-def grep_files(dir_path: Path, pattern: str, config: ScanConfig, context: int = 0) -> List[GrepMatch]:
-    """Search inside file contents for pattern matches."""
+def grep_files(
+    dir_path: Path,
+    pattern: str,
+    config: ScanConfig,
+    context: int = 0,
+    ignore_case: bool = False
+) -> List[GrepMatch]:
+    """
+    Search inside file contents for pattern matches.
+
+    Args:
+        dir_path: Target directory to search
+        pattern: Search pattern (string or regex)
+        config: Scan configuration
+        context: Number of context lines to show around matches
+        ignore_case: If True, perform case-insensitive search (default: case-sensitive)
+
+    Returns:
+        List of GrepMatch objects
+    """
     matches: List[GrepMatch] = []
     base_dir = dir_path.resolve()
 
-    # Build matcher function based on regex mode
+    # Build matcher function based on mode
+    # Default is case-sensitive; use -i flag to enable case-insensitive
+    regex_flags = re.IGNORECASE if ignore_case else 0
+
     if config.use_regex:
         try:
-            compiled = re.compile(pattern, re.IGNORECASE)
+            compiled = re.compile(pattern, regex_flags)
             matcher: Callable[[str], bool] = lambda line: bool(compiled.search(line))
         except re.error as e:
             logger.error(f"Invalid regex pattern: {e}")
             return []
     else:
-        pattern_lower = pattern.lower()
-        matcher = lambda line: pattern_lower in line.lower()
+        if ignore_case:
+            pattern_lower = pattern.lower()
+            matcher = lambda line: pattern_lower in line.lower()
+        else:
+            # Case-sensitive exact match
+            matcher = lambda line: pattern in line
 
     # DFS traversal
     stack = [dir_path]
@@ -108,8 +135,12 @@ def run_grep(args, target_path: Path):
         use_regex=getattr(args, 'regex', False)
     )
 
-    logger.info(f"\nSearching for '{args.grep_pattern}' in {target_path}...")
-    matches = grep_files(target_path, args.grep_pattern, config, args.context)
+    # Get ignore_case from args (default: False = case-sensitive)
+    ignore_case = getattr(args, 'ignore_case', False)
+
+    case_mode = "case-insensitive" if ignore_case else "case-sensitive"
+    logger.info(f"\nSearching for '{args.grep_pattern}' in {target_path} ({case_mode})...")
+    matches = grep_files(target_path, args.grep_pattern, config, args.context, ignore_case)
 
     if not matches:
         logger.error("No matches found.")
@@ -130,6 +161,7 @@ def run_grep(args, target_path: Path):
             import json
             json_data = {
                 "pattern": args.grep_pattern,
+                "case_sensitive": not ignore_case,
                 "target": str(target_path),
                 "total_matches": len(matches),
                 "files_matched": unique_files,
@@ -150,6 +182,7 @@ def run_grep(args, target_path: Path):
             with open(out_file, 'w', encoding='utf-8') as f:
                 f.write(f"# Grep Results: `{args.grep_pattern}`\n\n")
                 f.write(f"**Target**: `{target_path}`\n\n")
+                f.write(f"**Mode**: {'Case-insensitive' if ignore_case else 'Case-sensitive'}\n\n")
                 f.write(f"**Stats**: {len(matches)} matches in {unique_files} files\n\n")
                 f.write("```\n")
                 f.write(format_grep_output(matches, args.context > 0))
