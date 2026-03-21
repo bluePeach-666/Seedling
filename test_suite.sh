@@ -78,8 +78,13 @@ echo -e "  -> Testing SECURITY: Image Memory Bomb Limit..."
 mkdir -p "$TEST_DIR/huge_dir"
 seq 1 1505 | xargs -I {} touch "$TEST_DIR/huge_dir/file_{}.txt"
 OUTPUT=$(scan "$TEST_DIR/huge_dir" -F image -o "$OUT_DIR" -n "huge.png" 2>&1 || true)
-if [[ ! "$OUTPUT" == *"aborted to prevent memory overflow"* ]]; then
-    echo -e "${RED}Image memory bomb check failed!${NC}"; exit 1
+
+if [[ "$OUTPUT" == *"'Pillow' is required"* ]]; then
+    echo -e "${YELLOW}     Skipping Image memory bomb check: Pillow not installed.${NC}"
+elif [[ ! "$OUTPUT" == *"aborted to prevent memory overflow"* ]]; then
+    echo -e "${RED}Image memory bomb check failed! Output was: $OUTPUT${NC}"; exit 1
+else
+    echo "     Image memory bomb intercepted successfully."
 fi
 
 # ==============================================================================
