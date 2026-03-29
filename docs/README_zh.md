@@ -30,8 +30,8 @@ pipx install Seedling-tools
 
 ### 一键安装脚本
 
-  * **Windows**: 运行 `./install.bat`
-  * **macOS / Linux**: 运行 `bash install.sh`
+* **Windows**: 运行 `./install.bat`
+* **macOS / Linux**: 运行 `bash install.sh`
 
 ### 开发者 / 手动安装
 
@@ -41,35 +41,37 @@ pipx install Seedling-tools
 pipx install -e . --force
 ```
 
------
+---
 
 ## 作为 Python 库使用
 
-您现在可以通过 `ScanConfig` 引擎直接在 Python 代码中使用 Seedling 的核心功能：
+您现在可以通过直接在 Python 代码中使用 Seedling 的核心功能：
 
 ```python
-import seedling
-from seedling.core.config import ScanConfig
-from seedling.core.traversal import traverse_directory, build_tree_lines
+import seedlingtools
+from pathlib import Path
+from seedlingtools.core import ScanConfig, DepthFirstTraverser, StandardTreeRenderer
 
 # 初始化配置
 config = ScanConfig(max_depth=2, quiet=True)
 
 # 获取内存快照
-result = traverse_directory("./src", config)
+traverser = DepthFirstTraverser()
+result = traverser.traverse(Path("./src"), config)
 
 # 渲染树状线条
-lines = build_tree_lines(result, config)
+renderer = StandardTreeRenderer()
+lines = renderer.render(result, config)
 print("\n".join(lines))
 ```
 
------
+---
 
 ## CLI 命令参考
 
 Seedling-tools 采用清晰、显式的参数系统。
 
-### 1. `scan` - 探索器
+### 1. `scan`
 
 用于扫描目录、提取代码骨架或搜索项目。注意：`--full` 和 `--skeleton` 为互斥参数。
 
@@ -96,7 +98,7 @@ Seedling-tools 采用清晰、显式的参数系统。
 | `--dry-run` | 预览删除操作但不实际执行 (配合 `--delete` 使用)。 |
 | `--verbose` / `-q`| 调试日志模式 (`-v`) 或静默模式 (`-q`)。 |
 
-### 2. `build` - 建造师
+### 2. `build`
 
 将基于文本的树状图蓝图转换为真实的文件系统，或从快照中恢复项目。
 
@@ -108,104 +110,48 @@ Seedling-tools 采用清晰、显式的参数系统。
 | `--check` | **预检模式 (Dry-Run)**。模拟构建过程，报告缺失/已存在的项目。 |
 | `--force` | **强制覆盖**。直接覆盖已存在的文件而不跳过。 |
 
------
+---
 
-## v2.4 新功能 - 修复与改进
+## v2.5 新功能
 
-### 安全性
-- **`--dry-run` 模式**：在执行 `--delete` 前预览将要删除的内容：
-  ```bash
-  scan . -f "temp_*" --delete --dry-run
-  ```
+### 模块化插件与编排系统
+- **扫描管线 (Scan)**：高级扫描模式 (`--analyze`, `--grep`, `--skeleton`, `--find`) 现已通过 `ScanOrchestrator` 引擎实现插件化。
+- **构建管线 (Build)**：逆向构建模式现已全面升级为 `BuildOrchestrator` 对称编排架构，彻底解耦了拓扑解析 (Parsers)、预检拦截 (Plugins, 如 `--check`) 与物理写入 (Executors)。
 
-### 兼容性
-- **`--skeleton` 需要 Python 3.9+**：为 Python 3.8 用户提供清晰的错误提示
-- **Pillow 改为可选依赖**：仅在需要图片导出时安装 `pip install Seedling-tools[image]`
+### 统一基础设施
+- 将底层文件 I/O、安全越权校验与系统交互集中到健壮的全局单例实例中 (`logger`, `terminal`, `io_processor`, `image_renderer`)。
+- 引入了统一的异常体系 (`SeedlingToolsError` 及其派生类)，提供更精确、包含调试上下文的领域级错误报告。
 
-### 性能
-- **精确内存计算**：修复内存追踪，防止高 Unicode 密度文件导致 OOM 崩溃
-- **保守内存阈值**：降低至 80% 以增加安全余量
+### 功能预留
+- **接口预留**：架构层已提前挂载 **Token 统计属性**、**XML 结构化导出**以及**远程仓库克隆扫描**的逻辑钩子，为下个版本的 LLM 增强功能打好了地基。
 
-### JSON 输出模式
-导出结构化 JSON 格式的目录结构，便于程序化处理：
-```bash
-scan . -F json -o structure.json
-```
+---
 
-### 文件类型与 Include 过滤器
-按文件类型或自定义模式过滤：
-```bash
-scan . --type py -d 3
-scan . --include "*.md" --include "*.txt"
-```
-
-### 正则搜索模式
-在搜索中使用正则表达式：
-```bash
-scan . -f "test_.*\.py" --regex
-```
-
-### 内容搜索 (Grep 模式)
-在文件内容中搜索并显示上下文：
-```bash
-scan . --grep "TODO" -C 3 --type py
-scan . -g "def main" -C 2
-```
-
-### 项目分析
-分析项目结构和依赖：
-```bash
-scan . --analyze
-```
-
------
-
-## 项目结构 (v2.4)
+## 项目结构 (v2.5)
 
 ```text
 Seedling/
-├── docs/                      # 文档与更新日志
-│   ├── CHANGELOG.md           # 英文更新日志
-│   ├── CHANGELOG_zh.md        # 中文更新日志
-│   └── README_zh.md           # 中文说明文档
-├── seedling/                  # 核心包
+├── docs/                      # 文档与更新日志     
+├── seedlingtools/             # 核心包
 │   ├── commands/              # CLI 命令路由
-│   │   ├── build/             # 构建逻辑 (逆向工程)
-│   │   │   ├── __init__.py    # 构建 CLI 路由与参数校验
-│   │   │   └── architect.py   # 蓝图解析与安全物理构建
-│   │   └── scan/              # 扫描逻辑 (探索与提取)
-│   │       ├── __init__.py    # 中心路由与单次遍历触发器
-│   │       ├── analyzer.py    # 项目架构与依赖智能分析
-│   │       ├── exclude.py     # .gitignore 风格排除规则解析
-│   │       ├── explorer.py    # 目录树渲染与通用格式导出
-│   │       ├── full.py        # 强力模式 (大模型上下文全量聚合)
-│   │       ├── grep.py        # 纯内存内容搜索与上下文提取
-│   │       ├── json_output.py # 嵌套 JSON 结构化导出
-│   │       ├── search.py      # 文件搜索 (精确/模糊) 与安全删除
-│   │       └── skeleton.py    # Python AST 骨架提取 (逻辑剥离)
-│   ├── core/                  # 共享核心引擎
-│   │   ├── config.py          # 配置数据类与全局常量
-│   │   ├── detection.py       # 文件类型与二进制内容探针
-│   │   ├── io.py              # 文件读写、代码块边界碰撞与覆盖保护
-│   │   ├── logger.py          # 集中式 CLI 终端格式化与日志级别设定
-│   │   ├── patterns.py        # Glob/正则路径匹配引擎
-│   │   ├── sysinfo.py         # 硬件内存探针与系统深度限制获取
-│   │   ├── traversal.py       # 统一单次遍历缓存引擎
-│   │   └── ui.py              # 交互式提示与动态进度条
-│   ├── __init__.py            # 公开 API 暴露与包元数据
-│   └── main.py                # CLI 入口路由
-├── tests/                     # 单元测试 (核心机制、边缘场景、IO 安全等)
-├── install.bat                # Windows 一键安装脚本
-├── install.sh                 # Linux/macOS 一键安装脚本
-├── LICENSE                    # MIT 开源许可证
-├── pyproject.toml             # 构建配置与包元数据
-├── pytest.ini                 # Pytest 测试配置文件
-├── README.md                  # 项目主说明文档
-└── test_suite.sh              # 自动化端到端 (E2E) 测试脚本
+│   │   ├── build/             # 逆向构建管线
+│   │   └── scan/              # 扫描分析管线
+│   ├── core/                  # 共享核心引擎     
+│   ├── utils/                 # 全局基础设施   
+│   ├── __init__.py            # API 与包元数据
+│   └── main.py                # CLI 入口调度器
+├── tests/                     # Unit Test            
+├── install.bat                
+├── install.sh                 
+├── LICENSE                    
+├── pyproject.toml             
+├── pytest.ini                 
+├── README.md                  
+└── test_suite.sh              # E2E 自动化测试
 ```
 
------
+---
 
 ## 变更日志
 
-每一次发布的详细变更历史均记录于 [CHANGELOG.md](CHANGELOG.md) 文件中。
+每一次发布的详细变更历史均记录于 [docs/CHANGELOG.md](https://github.com/bbpeaches/Seedling/blob/main/docs/CHANGELOG.md) 文件中。

@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Seedling-tools"
-version = "2.4.3"
+version = "2.5.0"
 description = "A high-performance CLI toolkit designed for codebase exploration, intelligent analysis, and LLM context aggregation."
 readme = "README.md"
 authors = [
-    { name = "Blue Peach" }
+    { name = "Kaelen Chow" }
 ]
 requires-python = ">=3.8"
 keywords = [
@@ -43,5 +43,5 @@ Issues = "https://github.com/bbpeaches/Seedling/issues"
 Changelog = "https://github.com/bbpeaches/Seedling/blob/main/CHANGELOG.md"
 
 [project.scripts]
-scan = "seedling.main:scan"
-build = "seedling.main:build"
+scan = "seedlingtools.main:scan"
+build = "seedlingtools.main:build"

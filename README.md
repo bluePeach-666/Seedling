@@ -24,7 +24,7 @@ Read this document in other languages: [简体中文](https://github.com/bbpeach
 ## Installation
 
 Seedling-tools is designed to be installed globally via `pipx` for a clean, isolated environment.
-```
+```bash
 pipx install Seedling-tools
 ```
 
@@ -48,18 +48,20 @@ pipx install -e . --force
 You can now use Seedling's core features directly in your Python code via the `ScanConfig` engine:
 
 ```python
-import seedling
-from seedling.core.config import ScanConfig
-from seedling.core.traversal import traverse_directory, build_tree_lines
+import seedlingtools
+from pathlib import Path
+from seedlingtools.core import ScanConfig, DepthFirstTraverser, StandardTreeRenderer
 
 # Initialize Configuration
 config = ScanConfig(max_depth=2, quiet=True)
 
 # Taking Memory Snapshots
-result = traverse_directory("./src", config)
+traverser = DepthFirstTraverser()
+result = traverser.traverse(Path("./src"), config)
 
 # Render tree lines
-lines = build_tree_lines(result, config)
+renderer = StandardTreeRenderer()
+lines = renderer.render(result, config)
 print("\n".join(lines))
 ```
 
@@ -83,17 +85,17 @@ Used for scanning directories, extracting code skeletons, or searching for items
 | `--showhidden` | Include hidden files in the scan. |
 | `--depth`, `-d` | Maximum recursion depth. |
 | `--exclude`, `-e` | List of items to ignore. **Smart parse: auto-reads `.gitignore` files or accepts globs**. |
-| `--include` | **[NEW]** Only include files/directories matching patterns (e.g., `--include "*.py"`). |
-| `--type`, `-t` | **[NEW]** Filter by file type: `py`, `js`, `ts`, `cpp`, `go`, `java`, `rs`, `web`, `json`, `yaml`, `md`, `shell`, `all`. |
-| `--regex` | **[NEW]** Treat `-f` pattern as regular expression. |
-| `--grep`, `-g` | **[NEW]** Search inside file contents (Content Search Mode). |
-| `-C`, `--context` | **[NEW]** Show N lines of context around grep matches. |
-| `--analyze` | **[NEW]** Analyze project structure, type, dependencies, and architecture. |
+| `--include` | Only include files/directories matching patterns (e.g., `--include "*.py"`). |
+| `--type`, `-t` | Filter by file type: `py`, `js`, `ts`, `cpp`, `go`, `java`, `rs`, `web`, `json`, `yaml`, `md`, `shell`, `all`. |
+| `--regex` | Treat `-f` pattern as regular expression. |
+| `--grep`, `-g` | Search inside file contents (Content Search Mode). |
+| `-C`, `--context` | Show N lines of context around grep matches. |
+| `--analyze` | Analyze project structure, type, dependencies, and architecture. |
 | `--full` | **Power Mode**. Appends the full text content of all scanned source files. |
 | `--skeleton` | **[Experimental]** AST Code Skeleton extraction. Strips logic, retains signatures. |
 | `--text` | **Smart Filter**. Only scan text-based files (ignores binary/media). |
 | `--delete` | **Cleanup Mode**. Permanently delete items matched by `--find` (Interactive TTY only). |
-| `--dry-run` | **[NEW]** Preview deletions without executing (use with `--delete`). |
+| `--dry-run` | Preview deletions without executing (use with `--delete`). |
 | `--verbose` / `-q`| Verbose mode (`-v`) or Quiet mode (`-q`). |
 
 ### 2. `build` - The Architect
@@ -110,98 +112,42 @@ Turn a text-based tree into a real file system, or restore a project from a snap
 
 ---
 
-## New in v2.4 - Bug Fixes & Improvements
+## New in v2.5
 
-### Security
-- **`--dry-run` Mode**: Preview deletions before executing with `--delete`:
-  ```bash
-  scan . -f "temp_*" --delete --dry-run
-  ```
+### Modular Plugin & Orchestration System
+- **Scan Pipeline**: Advanced scanning modes (`--analyze`, `--grep`, `--skeleton`, `--find`) are now fully modularized via the `ScanOrchestrator` engine.
+- **Build Pipeline**: The reverse-build mode has been upgraded to a symmetrical `BuildOrchestrator` architecture. This completely decouples topology parsing (`parsers`), pre-flight interception (`plugins`, e.g., `--check`), and physical disk operations (`executors`).
 
-### Compatibility
-- **Python 3.9+ Required for `--skeleton`**: Clear error message for Python 3.8 users
-- **Pillow as Optional Dependency**: Install with `pip install Seedling-tools[image]` only if you need image export
+### Unified Infrastructure
+- Centralized low-level file I/O, security boundary validation, and system interactions into robust global singletons (`logger`, `terminal`, `io_processor`, `image_renderer`).
+- Introduced a unified exception hierarchy (`SeedlingToolsError` and its derivatives) for precise, context-aware domain error reporting.
 
-### Performance
-- **Accurate Memory Calculation**: Fixed memory tracking to prevent OOM crashes on high-Unicode files
-- **Conservative Memory Threshold**: Reduced to 80% for additional safety
-
-### JSON Output Mode
-Export directory structures as structured JSON for programmatic consumption:
-```bash
-scan . -F json -o structure.json
-```
-
-### File Type & Include Filters
-Filter by file type or custom patterns:
-```bash
-scan . --type py -d 3
-scan . --include "*.md" --include "*.txt"
-```
-
-### Regex Search Mode
-Use regular expressions in search:
-```bash
-scan . -f "test_.*\.py" --regex
-```
-
-### Content Search (Grep Mode)
-Search inside file contents with context:
-```bash
-scan . --grep "TODO" -C 3 --type py
-scan . -g "def main" -C 2
-```
-
-### Project Analysis
-Analyze project structure and dependencies:
-```bash
-scan . --analyze
-```
+### Future-Proofing & Roadmap
+- v2.5.1 Architectural Hooks: The core layer is now pre-wired with logical hooks for Token estimation, Structured XML export, and Remote repository scanning, laying a solid foundation for the LLM-centric enhancements in the next release.
 
 ---
 
-## Project Structure (v2.4)
+## Project Structure (v2.5)
 
 ```text
 Seedling/
-├── docs/                      # Documentation & Changelogs
-│   ├── CHANGELOG.md           # English version history
-│   ├── CHANGELOG_zh.md        # Chinese version history
-│   └── README_zh.md           # Chinese documentation
-├── seedling/                  # Core Package
+├── docs/                      # Documentation & Changelogs        
+├── seedlingtools/            # Core Package
 │   ├── commands/              # CLI Command Routers
-│   │   ├── build/             # Build logic (Reverse engineering)
-│   │   │   ├── __init__.py    # Build CLI router & validation
-│   │   │   └── architect.py   # Blueprint parsing & safe construction
-│   │   └── scan/              # Scan logic (Exploration & Extraction)
-│   │       ├── __init__.py    # Central Router & Single-pass trigger
-│   │       ├── analyzer.py    # Project architecture & dependency analysis
-│   │       ├── exclude.py     # .gitignore-style exclusion rule parser
-│   │       ├── explorer.py    # Tree rendering & generic format export
-│   │       ├── full.py        # Power Mode (LLM context aggregation)
-│   │       ├── grep.py        # In-memory content search & context extraction
-│   │       ├── json_output.py # Nested JSON structured export
-│   │       ├── search.py      # File search (Exact/Fuzzy) & safe deletion
-│   │       └── skeleton.py    # Python AST extraction (Implementation stripping)
+│   │   ├── build/             # Build logic
+│   │   └── scan/              # Scan logic
 │   ├── core/                  # Shared Core Engines
-│   │   ├── config.py          # Configuration dataclasses & global constants
-│   │   ├── detection.py       # File type & binary content probe
-│   │   ├── io.py              # File R/W, Fence collision & Overwrite protection
-│   │   ├── logger.py          # Centralized CLI formatter & log levels
-│   │   ├── patterns.py        # Glob/Regex path matching engine
-│   │   ├── sysinfo.py         # Hardware RAM probe & depth limits
-│   │   ├── traversal.py       # Unified single-pass caching engine
-│   │   └── ui.py              # Interactive prompts & progress bars
+│   ├── utils/                 # Unified Infrastructure & Constants
 │   ├── __init__.py            # Public API & Metadata exposure
-│   └── main.py                # CLI Entry Point Router
-├── tests/                     # Unit Tests (Core, Edge Cases, IO)
-├── install.bat                # Windows one-click installer
-├── install.sh                 # Linux/macOS one-click installer
-├── LICENSE                    # MIT License
-├── pyproject.toml             # Build configuration & Package metadata
-├── pytest.ini                 # Pytest configuration file
-├── README.md                  # Main documentation
-└── test_suite.sh              # Automated E2E tests
+│   └── main.py                # CLI Entry Point Dispatcher
+├── tests/                     # Unit Test      
+├── install.bat                
+├── install.sh                 
+├── LICENSE                    
+├── pyproject.toml             
+├── pytest.ini                 
+├── README.md                  
+└── test_suite.sh              # E2E Automated Checks
 ```
 
 ---

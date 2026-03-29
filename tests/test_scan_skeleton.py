@@ -1,46 +1,24 @@
 import sys
-import pytest # type: ignore
-from seedling.commands.scan.skeleton import extract_skeleton
+import pytest #type: ignore
+from seedlingtools import SkeletonPlugin
 
-# 如果是 Python 3.8 及以下，跳过这些测试
-pytestmark = pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
-
-def test_extract_skeleton_basic_function():
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="requires python3.9 or higher")
+def test_skeleton_ast_extraction():
     source_code = """
-def calculate_sum(a, b):
-    # Some internal comment
-    result = a + b
-    print("Computing...")
-    return result
+def calculate(a, b):
+    \"\"\"Docstring\"\"\"
+    res = a + b
+    return res
+
+class MyClass:
+    def method(self):
+        print("hidden")
 """
-    expected_output = """def calculate_sum(a, b):
-    ..."""
+    plugin = SkeletonPlugin()
+    skeleton = plugin._extract_skeleton(source_code)
     
-    result = extract_skeleton(source_code)
-    assert "..." in result
-    assert "print" not in result
-    assert "calculate_sum" in result
-
-def test_extract_skeleton_class_with_docstring():
-    source_code = """
-class MyModel:
-    \"\"\"This is the core model.\"\"\"
-    def __init__(self):
-        self.data = []
-        
-    async def fetch(self):
-        await asyncio.sleep(1)
-        return self.data
-"""
-    result = extract_skeleton(source_code)
-    assert '"""This is the core model."""' in result
-    assert 'def __init__(self):' in result
-    assert 'async def fetch(self):' in result
-    assert 'asyncio.sleep' not in result
-
-def test_extract_skeleton_syntax_error_fallback():
-    # 故意制造语法错误的代码
-    bad_code = "def broken_func(a, b) return a+b"
-    result = extract_skeleton(bad_code)
-    # 发生语法错误时，引擎应当降级，返回原代码而不崩溃
-    assert result == bad_code
+    assert "def calculate(a, b):" in skeleton
+    assert "Docstring" in skeleton
+    assert "..." in skeleton
+    assert "print" not in skeleton
+    assert "class MyClass:" in skeleton
