@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 .pytest_cache/
 .ipynb_checkpoints/
-.claude/
 
 # --- Distribution & Build Artifacts ---
 dist/
@@ -39,6 +38,7 @@ desktop.ini
 
 # --- Editor Specific ---
 .vscode/
+.claude/
 .idea/
 
 # --- Seedling Generated Reports & Local Tests ---
