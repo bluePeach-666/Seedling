@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Seedling-tools"
-version = "2.5.0"
+version = "2.5.1"
 description = "A high-performance CLI toolkit designed for codebase exploration, intelligent analysis, and LLM context aggregation."
 readme = "README.md"
 authors = [

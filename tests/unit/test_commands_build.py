@@ -1,4 +1,6 @@
-import pytest # type: ignore
+# Unit tests for Seedling-tools v2.5.
+# Copyright (c) 2026 Kaelen Chow. All rights reserved.
+
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from unittest.mock import MagicMock
@@ -28,12 +30,11 @@ def test_build_orchestrator_pipeline_success() -> None:
     mock_parser.parse.assert_called_once_with(source_file, target_dir.resolve(strict=False))
     
     mock_executor.execute.assert_called_once_with(
-        dummy_parsed_items, 
-        dummy_contents, 
-        target_dir.resolve(strict=False), 
-        False
+        parsed_items=dummy_parsed_items, 
+        contents=dummy_contents, 
+        target_path=target_dir.resolve(strict=False), 
+        force_mode=False
     )
-
 
 def test_build_orchestrator_pipeline_abort_on_empty_parse() -> None:
     mock_parser: MagicMock = MagicMock(spec=AbstractBlueprintParser)

@@ -4,73 +4,65 @@ import re
 from abc import ABC, abstractmethod
 from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, List, Optional, Final, Tuple
+
 from .sysinfo import is_relative_to_compat
 from .log_helper import logger
 from .exceptions import FileSystemError
 from .constants import FileSettings
+from .patterns import SingletonMeta
 
 class AbstractIOProcessor(ABC):
-    """文件系统输入输出处理的抽象接口"""
-
     @abstractmethod
     def validate_path_security(self, path: Path, base_dir: Path) -> bool:
-        """校验目标路径是否安全地处于基础目录边界内"""
         pass
 
     @abstractmethod
     def calculate_markdown_fence(self, content: str) -> str:
-        """计算转义所需的最优 Markdown 代码块边界符号"""
         pass
 
     @abstractmethod
     def parse_directory_tree(self, file_path: Path) -> List[str]:
-        """从标准文本文件中提取目录树结构"""
         pass
 
     @abstractmethod
     def deserialize_fenced_blocks(self, file_path: Path) -> Dict[str, str]:
-        """解析并提取标准结构化文档中的文件内容块"""
         pass
 
     @abstractmethod
     def delete_path(self, path: Path) -> None:
-        """删除路径操作"""
         pass
 
     @abstractmethod
     def probe_binary_signature(self, file_path: Path) -> bool:
-        """基于文件头的字节码特征进行深度二进制探测"""
         pass
 
     @abstractmethod
     def read_text_safely(self, file_path: Path, quiet: bool = False) -> Optional[str]:
-        """安全的文本读取策略，处理编码降级与二进制拦截"""
         pass
 
     @abstractmethod
     def write_text_safely(self, file_path: Path, content: str) -> None:
-        """安全的文本写入策略，统一异常拦截"""
         pass
 
     @abstractmethod
     def parse_tree_topology(self, tree_lines: List[str]) -> List[Dict[str, Any]]:
-        """将原始文本行解析为结构化的树状拓扑字典列表"""
         pass
 
     @abstractmethod
     def compare_file_content(self, path: Path, expected_content: str) -> bool:
-        """比较磁盘文件内容与预期字符串是否不一致"""
         pass
 
-class LocalFileSystemIO(AbstractIOProcessor):
-    """基于本地文件系统的 IO 处理实现类"""
-
+class LocalFileSystemIO(AbstractIOProcessor, metaclass=SingletonMeta):
     def validate_path_security(self, path: Path, base_dir: Path) -> bool:
         try:
             p_resolved: Path = path.resolve()
             base_resolved: Path = base_dir.resolve()
             return is_relative_to_compat(p_resolved, base_resolved)
-        except (OSError, RuntimeError, ValueError):
+        except OSError:
+            return False
+        except RuntimeError:
+            return False
+        except ValueError:
             return False
 
     def calculate_markdown_fence(self, content: str) -> str:
@@ -84,9 +76,10 @@ class LocalFileSystemIO(AbstractIOProcessor):
         return '`' * (max_ticks + 1)
 
     def parse_directory_tree(self, file_path: Path) -> List[str]:
+        lines: List[str] = []
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                lines: List[str] = f.readlines()
+                lines = f.readlines()
         except OSError as err:
             raise FileSystemError(
                 message=f"Failed to read tree blueprint: {file_path.name}",
@@ -99,27 +92,34 @@ class LocalFileSystemIO(AbstractIOProcessor):
 
         for i, line in enumerate(lines):
             stripped: str = line.rstrip()
-            if not stripped:
-                if in_tree:
+            if len(stripped) == 0:
+                if in_tree is True:
                     break
                 else:
                     continue
                 
-            has_tree_chars: bool = any(c in line for c in tree_chars)
+            has_tree_chars: bool = False
+            for c in tree_chars:
+                if c in line:
+                    has_tree_chars = True
+                    break
+                    
             next_has_tree_chars: bool = False
-            
-            if i + 1 < len(lines):
-                next_has_tree_chars = any(c in lines[i+1] for c in tree_chars)
+            if (i + 1) < len(lines):
+                for c in tree_chars:
+                    if c in lines[i+1]:
+                        next_has_tree_chars = True
+                        break
                 
-            if has_tree_chars:
+            if has_tree_chars is True:
                 in_tree = True
-                if not stripped.startswith('```'): 
+                if stripped.startswith('```') is False: 
                     tree_lines.append(stripped)
             else:
-                if not in_tree:
-                    if next_has_tree_chars:
+                if in_tree is False:
+                    if next_has_tree_chars is True:
                         in_tree = True
-                        if not stripped.startswith('```'): 
+                        if stripped.startswith('```') is False: 
                             tree_lines.append(stripped)
                 else:
                     if stripped.startswith('```'):
@@ -130,9 +130,10 @@ class LocalFileSystemIO(AbstractIOProcessor):
         return tree_lines
 
     def deserialize_fenced_blocks(self, file_path: Path) -> Dict[str, str]:
+        lines: List[str] = []
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                lines: List[str] = f.readlines()
+                lines = f.readlines()
         except OSError as err:
             raise FileSystemError(f"Failed to read content payload: {file_path.name}") from err
 
@@ -144,27 +145,27 @@ class LocalFileSystemIO(AbstractIOProcessor):
         for line in lines:
             stripped: str = line.strip()
 
-            if not current_file:
+            if current_file is None:
                 if stripped.startswith('### FILE: '):
                     raw_path: str = stripped.replace('### FILE: ', '').strip()
                     current_file = PureWindowsPath(raw_path).as_posix()
                     current_content = [] 
-                    continue
+                continue
 
-            if current_file:
+            if current_file is not None:
                 match: Optional[re.Match[str]] = re.match(r'^(`{3,})', stripped)
                 
-                if not fence_stack:
-                    if match:
+                if len(fence_stack) == 0:
+                    if match is not None:
                         fence_stack.append(match.group(1))
                     continue
                 
-                if match:
+                if match is not None:
                     ticks: str = match.group(1)
                     if ticks == fence_stack[-1]:
                         if len(stripped) == len(ticks):
                             fence_stack.pop()
-                            if not fence_stack:
+                            if len(fence_stack) == 0:
                                 file_contents[current_file] = "".join(current_content).rstrip('\n') + '\n'
                                 current_file = None
                                 continue
@@ -183,11 +184,11 @@ class LocalFileSystemIO(AbstractIOProcessor):
     
     def delete_path(self, path: Path) -> None:
         try:
-            if path.is_file():
+            if path.is_file() is True:
                 path.unlink()
-            elif path.is_symlink():
+            elif path.is_symlink() is True:
                 path.unlink()
-            elif path.is_dir():
+            elif path.is_dir() is True:
                 shutil.rmtree(path)
         except OSError as err:
             raise FileSystemError(
@@ -215,7 +216,7 @@ class LocalFileSystemIO(AbstractIOProcessor):
         return False
 
     def read_text_safely(self, file_path: Path, quiet: bool = False) -> Optional[str]:
-        if self.probe_binary_signature(file_path):
+        if self.probe_binary_signature(file_path) is True:
             return None
 
         encodings: Tuple[str, ...] = ('utf-8', 'gbk', 'big5', 'utf-16', 'latin-1')
@@ -224,21 +225,23 @@ class LocalFileSystemIO(AbstractIOProcessor):
             try:
                 with open(file_path, 'r', encoding=enc, errors='strict') as f:
                     return f.read()
-            except (UnicodeDecodeError, LookupError):
+            except UnicodeDecodeError:
                 continue 
+            except LookupError:
+                continue
             except OSError as err:
-                if not quiet:
+                if quiet is False:
                     logger.debug(f"IO failure while reading {file_path.name}: {err}")
                 return None
 
-        if not quiet:
+        if quiet is False:
             logger.warning(f"Skipped {file_path.name}: Unsupported character encoding.")
             
         return None
 
     def write_text_safely(self, file_path: Path, content: str) -> None:
         try:
-            if not file_path.parent.exists():
+            if file_path.parent.exists() is False:
                 file_path.parent.mkdir(parents=True, exist_ok=True)
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
@@ -254,7 +257,7 @@ class LocalFileSystemIO(AbstractIOProcessor):
         
         for line in tree_lines:
             match: Optional[re.Match[str]] = re.match(r'^([│├└─\s]*)(.+)$', line)
-            if not match:
+            if match is None:
                 continue
                 
             prefix: str = match.group(1)
@@ -275,7 +278,7 @@ class LocalFileSystemIO(AbstractIOProcessor):
                 is_dir = True
                 clean_name = clean_name.rstrip('/')
                 
-            if clean_name:
+            if len(clean_name) > 0:
                 if clean_name != '.':
                     if clean_name != '..':
                         item_dict: Dict[str, Any] = {
@@ -296,10 +299,10 @@ class LocalFileSystemIO(AbstractIOProcessor):
         return raw_items
     
     def compare_file_content(self, path: Path, expected_content: str) -> bool:
-        if not path.exists():
+        if path.exists() is False:
             return True
 
-        if not path.is_file():
+        if path.is_file() is False:
             return True
 
         actual_content: Optional[str] = self.read_text_safely(path, quiet=True)
@@ -313,4 +316,3 @@ class LocalFileSystemIO(AbstractIOProcessor):
         return False
 
 io_processor: Final[AbstractIOProcessor] = LocalFileSystemIO()
-"""全局文件 IO 单例"""

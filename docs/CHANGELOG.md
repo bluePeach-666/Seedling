@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-03-29
+
+### Added
+- Adds a smart garbage file interceptor (`intercept_garbage_files`) to automatically detect project noise like `node_modules`, `.DS_Store`, and `__pycache__`.
+- Adds an intent-aware state machine that silences warnings for power users (who use `-e` or `--nohidden`) and safely downgrades warnings during simple `-f` searches to prevent workflow interruptions.
+- Adds fully realized `XmlExporter` and `JsonExporter` that support deep context data (`EstimatedTokens` and `SourceContents`).
+- Adds a heuristic Token estimation engine, calculating and displaying `estimated_tokens` based on character weight across all output formats.
+- Adds the `--nohidden` flag; hidden files (e.g., `.env`, `.gitignore`) are now scanned by default and are only excluded when this flag is explicitly declared.
+- Adds remote repository sandbox routing for `http/https/git@` protocols to instantly clone, scan, and clean up remote codebases.
+- Adds an ultimate E2E automated test suite covering 20+ core scenarios with millisecond-level execution and system environment auditing.
+
+### Changed
+- Enhances the garbage interceptor with look-ahead filter logic; it now pre-simulates type (`-t`) and exclusion (`-e`) filters and only warns if noise actually penetrates into the final report.
+- Refactors `BuildOrchestrator` with explicit boolean logic and improved plugin observability, automatically recording and reporting the names of plugins that intercept builds.
+- Unifies the `AbstractExporter` interface to ensure strict structural symmetry across Markdown, JSON, and XML metadata handling.
+- Enhances `SkeletonPlugin` robustness by adding strict suffix pre-checks to prevent the AST parser from hanging on non-code or binary files.
+
+### Fixed
+- Fixes a logic redundancy where the system would still warn about garbage files that had already been successfully blocked by `-t` or `-e` flags.
+- Fixes a type contract error (`reportCallIssue` in Pylance) in the build engine by properly aligning keyword arguments between the orchestrator and physical executor.
+- Fixes an interactive deadlock that caused headless/CI environments (non-TTY) to hang while waiting for `stdin`.
+- Fixes a search mode interference UX bug where searching for dot-prefixed keywords (e.g., `-f .gitignore`) triggered false-positive garbage warnings.
+- Fixes a potential path traversal vulnerability by enforcing strict `resolve()` consistency on `target_path` within `BuildOrchestrator`, fully securing the I/O pipeline.
+
 ## [2.5.0] - 2026-03-28
 
 *Note: This is a major architectural refactor, transitioning to a symmetrical orchestrator-based design with unified infrastructure and centralized pattern matching.*

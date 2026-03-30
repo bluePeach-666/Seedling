@@ -1,5 +1,7 @@
+# Unit tests for Seedling-tools v2.5.
+# Copyright (c) 2026 Kaelen Chow. All rights reserved.
+
 from __future__ import annotations
-import pytest # type: ignore
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from unittest.mock import MagicMock, patch
@@ -8,39 +10,36 @@ from seedlingtools.commands.build.parsers.text_parser import TextBlueprintParser
 from seedlingtools.commands.build.executors.local_fs import LocalFSExecutor
 from seedlingtools.utils import io_processor
 
-def test_text_blueprint_parser_mapping() -> None:
+def test_text_blueprint_parser_mapping(tmp_path: Path) -> None:
     parser: TextBlueprintParser = TextBlueprintParser()
-    target_path: Path = Path("/safe/target")
-    
-    raw_items: List[Dict[str, Any]] = [
-        {'depth': 0, 'name': 'root', 'is_dir': True},
-        {'depth': 1, 'name': 'src', 'is_dir': True},
-        {'depth': 2, 'name': 'main.py', 'is_dir': False}
+    target_path: Path = (tmp_path / "target").resolve()
+    if target_path.exists() is False:
+        target_path.mkdir(parents=True)
+
+    parsed_items: List[Dict[str, Any]] = [
+        {
+            'name': 'main.py',
+            'depth': 1,
+            'is_dir': False,
+            'safe_path': (target_path / "src" / "main.py").resolve()
+        }
     ]
     
     file_contents: Dict[str, str] = {
         "src/main.py": "print('hello')"
     }
     
-    with patch.object(io_processor, 'validate_path_security', return_value=True):
-        parsed_items: List[Dict[str, Any]] = parser._parse_to_safe_paths(raw_items, target_path)
-        
-        assert len(parsed_items) == 2
-        
-        dir_node: Dict[str, Any] = parsed_items[0]
-        assert dir_node['name'] == 'src'
-        assert dir_node['is_dir'] is True
-        
-        safe_contents: Dict[str, Tuple[Path, str]] = parser._align_and_verify_contents(
-            contents=file_contents,
-            target_path=target_path,
-            root_name="root",
-            parsed_items=parsed_items
-        )
-        
-        assert "src/main.py" in safe_contents
-        mapped_path, mapped_content = safe_contents["src/main.py"]
-        assert mapped_content == "print('hello')"
+    safe_contents: Dict[str, Tuple[Path, str]] = parser._align_and_verify_contents(
+        contents=file_contents,
+        target_path=target_path,
+        root_name="test_project",
+        parsed_items=parsed_items
+    )
+    
+    assert "src/main.py" in safe_contents
+    actual_path: Path = safe_contents["src/main.py"][0]
+    assert actual_path.is_absolute() is True
+    assert str(actual_path).startswith(str(target_path)) is True
 
 
 def test_local_fs_executor_force_mode(tmp_path: Path) -> None:

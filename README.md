@@ -8,54 +8,48 @@
 **Seedling-tools** is a high-performance CLI toolkit designed for codebase exploration, intelligent analysis, and LLM context aggregation.
 
 Core Capabilities:
-1. SCAN: Export directory trees to Markdown, TXT, JSON, or Images.
-2. FIND & GREP: Perform exact/fuzzy file searches and regex-based content matching.
-3. ANALYZE: Auto-detect project architecture, dependencies, and entry points.
-4. SKELETON: Extract Python AST structures (stripping implementation logic).
-5. POWER MODE: Aggregate full repository source code for LLM prompts.
-6. BUILD: Reconstruct physical file systems from text-based blueprints.
-
-Powered by a unified, single-pass caching traversal engine.
+1.  **SCAN**: Serialize and export directory tree structures to Markdown, TXT, JSON, XML, or high-definition image formats.
+2.  **FIND & GREP**: Perform exact or fuzzy filename searches, as well as cross-file full-text content matching based on regular expressions.
+3.  **ANALYZE**: Automatically detect project architecture patterns, core dependency package matrices, and program command entry points.
+4.  **SKELETON**: Extract Python code skeletons based on AST, automatically stripping underlying implementation logic to retain only the top-level signatures of classes and functions.
+5.  **POWER MODE**: Fully aggregate the source code of the target codebase, with a built-in heuristic Token consumption estimation engine to provide an extremely pure context for LLMs.
+6.  **TEMPLATE**: Prompt template engine, enabling automated context assembly and LLM review instruction injection via the `{{SEEDLING_CONTEXT}}` placeholder.
+7.  **REMOTE**: Supports remote Git URLs, instantly completing repository cloning, parsing, and secure destruction in an independent sandbox.
+8.  **BUILD**: Parse plaintext topology blueprints, perform conflict-free pre-checks, and reverse-engineer/build a real physical file system with one click.
 
 Read this document in other languages: [简体中文](https://github.com/bbpeaches/Seedling/blob/main/docs/README_zh.md)
 
----
+-----
 
 ## Installation
-
-Seedling-tools is designed to be installed globally via `pipx` for a clean, isolated environment.
+Seedling-tools is recommended to be installed globally via `pipx` to ensure a clean, isolated environment.
 ```bash
 pipx install Seedling-tools
 ```
 
 ### One-Click Setup
-
-* **Windows**: Run `./install.bat`
-* **macOS / Linux**: Run `bash install.sh`
+  * **Windows**: Run `./install.bat`
+  * **macOS / Linux**: Run `bash install.sh`
 
 ### Developer / Manual Install
-
-If you are modifying the source code, use **Editable Mode**:
-
+If you need to modify the source code, please use **Editable Mode**:
 ```bash
 pipx install -e . --force
 ```
 
----
+-----
 
 ## Python Library Usage
-
-You can now use Seedling's core features directly in your Python code via the `ScanConfig` engine:
-
+You can now use Seedling's core features directly in your Python code:
 ```python
 import seedlingtools
 from pathlib import Path
 from seedlingtools.core import ScanConfig, DepthFirstTraverser, StandardTreeRenderer
 
-# Initialize Configuration
+# Initialize configuration
 config = ScanConfig(max_depth=2, quiet=True)
 
-# Taking Memory Snapshots
+# Take memory snapshot
 traverser = DepthFirstTraverser()
 result = traverser.traverse(Path("./src"), config)
 
@@ -65,93 +59,121 @@ lines = renderer.render(result, config)
 print("\n".join(lines))
 ```
 
----
+-----
+
+## Command Line Usage
+The core advantage of Seedling-tools is its ability to cleanly and efficiently aggregate complex codebases into structured text that LLMs can directly digest.
+
+### Scenario 1: Providing the Entire Backend Context to an LLM
+If you are a Python developer and need an LLM to help you review or refactor backend business logic, you can use a combined command to accurately grab all Python files, excluding unnecessary cache and test files:
+```bash
+scan . -t py -e .gitignore --full
+```
+This generates a Markdown file with the directory tree and full source code, while automatically filtering out multimedia files and non-Python code, saving valuable Tokens.
+
+### Scenario 2: Automated Review Based on Prompt Templates
+You can write a prompt file in advance. Leave a `{{SEEDLING_CONTEXT}}` placeholder in the template, and Seedling will automatically inject the generated context into that position after the scan is complete. For example, using the official example template provided in this project [docs/prompt\_example.md](https://github.com/bbpeaches/Seedling/blob/main/docs/prompt_example.md):
+```bash
+scan . --full --template docs/prompt_example.md -o ./reports -n output_report.md -e ".gitignore"
+```
+
+### Scenario 3: Instant Scanning of Open-Source Projects
+No need to manually clone the entire repository. Pass the remote Git URL directly to Seedling, and it will clone, analyze, and aggregate the context in a temporary directory, automatically destroying and cleaning it up when finished:
+```bash
+scan https://github.com/bbpeaches/Seedling.git -t py --analyze --full
+```
+
+-----
 
 ## CLI Reference
-
 Seedling-tools uses a clean, explicit argument system.
 
-### 1. `scan` - The Explorer
-
-Used for scanning directories, extracting code skeletons, or searching for items. Note: `--full` and `--skeleton` are mutually exclusive.
+### 1. `scan`  
+Used for scanning directories, extracting code skeletons, or searching for items. Note: `--full` and `--skeleton` are mutually exclusive parameters.
 
 | Argument | Description |
 | --- | --- |
-| `target` | Target directory for scanning or searching (Defaults to `.`). |
-| `--find`, `-f` | **Search Mode**. Fast CLI search (Exact & Fuzzy). Combine with `--full` to export a code report. |
-| `--format`, `-F` | Output format: `md` (default), `txt`, `json`, or `image`. |
+| `target` | Target directory to scan or search, **or a remote Git repository URL**. |
+| `--find`, `-f` | **Search Mode**. Fast CLI search (Exact & Fuzzy). Combine with `--full` to export code reports. |
+| `--format`, `-F` | Output format: `md` (default), `txt`, `json`, `xml` or `image`. |
 | `--name`, `-n` | Custom output filename. |
-| `--outdir`, `-o` | Where to save the result. |
-| `--showhidden` | Include hidden files in the scan. |
+| `--outdir`, `-o` | Target directory path to save the results. |
+| `--nohidden` | Exclude hidden files. (v2.5.1+ scans hidden files by default; explicitly declare this parameter to block them). |
 | `--depth`, `-d` | Maximum recursion depth. |
-| `--exclude`, `-e` | List of items to ignore. **Smart parse: auto-reads `.gitignore` files or accepts globs**. |
+| `--exclude`, `-e` | List of items to exclude. **Smart parse: auto-reads `.gitignore` files or accepts Globs**. |
 | `--include` | Only include files/directories matching patterns (e.g., `--include "*.py"`). |
 | `--type`, `-t` | Filter by file type: `py`, `js`, `ts`, `cpp`, `go`, `java`, `rs`, `web`, `json`, `yaml`, `md`, `shell`, `all`. |
-| `--regex` | Treat `-f` pattern as regular expression. |
-| `--grep`, `-g` | Search inside file contents (Content Search Mode). |
+| `--regex` | Treat `-f` or `-g` search patterns as regular expressions. |
+| `--grep`, `-g` | Perform matching searches inside file contents. |
 | `-C`, `--context` | Show N lines of context around grep matches. |
-| `--analyze` | Analyze project structure, type, dependencies, and architecture. |
-| `--full` | **Power Mode**. Appends the full text content of all scanned source files. |
-| `--skeleton` | **[Experimental]** AST Code Skeleton extraction. Strips logic, retains signatures. |
-| `--text` | **Smart Filter**. Only scan text-based files (ignores binary/media). |
-| `--delete` | **Cleanup Mode**. Permanently delete items matched by `--find` (Interactive TTY only). |
-| `--dry-run` | Preview deletions without executing (use with `--delete`). |
-| `--verbose` / `-q`| Verbose mode (`-v`) or Quiet mode (`-q`). |
+| `--analyze` | Analyze project macro-structure, type, dependencies, and architecture (combine with `--full` to append micro-source code at the end of the report). |
+| `--template` | **Prompt Template Engine**. Pass a file path containing the `{{SEEDLING_CONTEXT}}` placeholder to automatically perform context injection assembly. |
+| `--full` | **Power Mode**. Append the full text content of all scanned source files and automatically estimate total Token consumption. |
+| `--skeleton` | **[Experimental]** AST Code Skeleton extraction. Automatically strips internal implementation logic, retaining only class and function signatures. |
+| `--text` | **Smart Filter**. Force scanning of text-format files only (the underlying engine will automatically intercept and ignore binary/media files). |
+| `--delete` | **Cleanup Mode**. Permanently delete items matched by `--find` (has security intercepts, only available in interactive TTY terminals). |
+| `--dry-run` | Preview deletion operations without actually executing physical deletion (use with `--delete`). |
+| `--verbose` / `-q`| Enable debug logging mode (`-v`) or quiet mode (`-q`). |
 
-### 2. `build` - The Architect
-
-Turn a text-based tree into a real file system, or restore a project from a snapshot.
+### 2. `build`
+Turn a text-based tree blueprint into a real file system, or restore a project from a snapshot.
 
 | Argument | Description |
 | --- | --- |
 | `file` | The source tree blueprint file (`.txt` or `.md`). |
-| `target` | Where to build the structure (Defaults to current directory). |
-| `--direct`, `-d` | **Direct Mode**. Bypass prompts to instantly create a specific path. |
-| `--check` | **Dry-Run**. Simulate the build and report missing/existing items. |
-| `--force` | **Force Mode**. Overwrite existing files without skipping. |
+| `target` | Storage location for the built structure (Defaults to the current execution directory). |
+| `--direct`, `-d` | **Direct Mode**. Skip interactive prompts and immediately create the specified single file or folder path on disk. |
+| `--check` | **Dry-Run Mode**. Perform a conflict-free simulated build and report missing, existing, or content-mismatched items. |
+| `--force` | **Force Mode**. Directly overwrite files that already exist on the physical disk and have conflicting content without prompting to skip. |
 
----
+-----
 
-## New in v2.5
+## v2.5 Core Features
 
-### Modular Plugin & Orchestration System
-- **Scan Pipeline**: Advanced scanning modes (`--analyze`, `--grep`, `--skeleton`, `--find`) are now fully modularized via the `ScanOrchestrator` engine.
-- **Build Pipeline**: The reverse-build mode has been upgraded to a symmetrical `BuildOrchestrator` architecture. This completely decouples topology parsing (`parsers`), pre-flight interception (`plugins`, e.g., `--check`), and physical disk operations (`executors`).
+### Smart Interaction & Filtering
+  - **Smart Garbage File Interceptor**: Introduced heuristic detection logic to automatically identify and intercept project noise like `node_modules`, `.DS_Store`, `__pycache__`, etc.
+  - **Intent-Aware & Interactive Downgrade**: The system can automatically distinguish between "expert mode" and "normal mode". In single search modes or non-interactive environments, it automatically downgrades to silent warnings without blocking the core workflow.
+
+### Modular Plugins & Symmetrical Orchestration System
+  - **Scan Pipeline**: Advanced scanning modes are now fully modularized via the `ScanOrchestrator` engine.
+  - **Build Pipeline**: The reverse-build mode has been comprehensively upgraded to the `BuildOrchestrator` symmetrical orchestration architecture, completely decoupling topology parsing, pre-flight interception, and physical writing.
+
+### LLM Enhanced Context Engine
+  - **Structured XML Export**: Added `-F xml` format support.
+  - **Token Estimation**: After each full scan and aggregation, automatically appends a heuristic algorithm-based Token consumption estimate to the terminal and the top of the output report, helping developers accurately control the context window limits of LLMs.
+  - **Prompt Templates**: Added the `--template` parameter. Allows developers to pass in a custom review prompt file; Seedling will automatically and accurately inject the full code context into the `{{SEEDLING_CONTEXT}}` placeholder after scanning, generating a Prompt ready to be fed directly.
+  - **Remote Repository Scanning**: CLI supports passing in Git HTTPS/SSH links directly.
 
 ### Unified Infrastructure
-- Centralized low-level file I/O, security boundary validation, and system interactions into robust global singletons (`logger`, `terminal`, `io_processor`, `image_renderer`).
-- Introduced a unified exception hierarchy (`SeedlingToolsError` and its derivatives) for precise, context-aware domain error reporting.
+  - Centralized low-level file I/O, security boundary validation, Git lifecycle scheduling, and system interactions into robust global singleton instances.
+  - Introduced a unified exception hierarchy, providing more precise domain-level error report interception containing debugging context.
 
-### Future-Proofing & Roadmap
-- v2.5.1 Architectural Hooks: The core layer is now pre-wired with logical hooks for Token estimation, Structured XML export, and Remote repository scanning, laying a solid foundation for the LLM-centric enhancements in the next release.
-
----
+-----
 
 ## Project Structure (v2.5)
-
 ```text
 Seedling/
-├── docs/                      # Documentation & Changelogs        
-├── seedlingtools/            # Core Package
+├── docs/                      # Documentation & Changelogs     
+├── seedlingtools/             # Core Package
 │   ├── commands/              # CLI Command Routers
-│   │   ├── build/             # Build logic
-│   │   └── scan/              # Scan logic
-│   ├── core/                  # Shared Core Engines
-│   ├── utils/                 # Unified Infrastructure & Constants
-│   ├── __init__.py            # Public API & Metadata exposure
-│   └── main.py                # CLI Entry Point Dispatcher
-├── tests/                     # Unit Test      
+│   │   ├── build/             # Reverse build pipeline
+│   │   └── scan/              # Scan & analyze pipeline
+│   ├── core/                  # Shared Core Engines     
+│   ├── utils/                 # Global Infrastructure   
+│   ├── __init__.py            # API & Package Metadata
+│   └── main.py                # CLI Entry Dispatcher
+├── tests/                     # Unit Test & E2E Automated Tests 
 ├── install.bat                
 ├── install.sh                 
 ├── LICENSE                    
 ├── pyproject.toml             
 ├── pytest.ini                 
 ├── README.md                  
-└── test_suite.sh              # E2E Automated Checks
+└── run.sh                     # UT + E2E Automated Test Suite Entrypoint
 ```
 
----
+-----
 
 ## Changelog
 
-Detailed changes for each release are documented in the [docs/CHANGELOG.md](https://github.com/bbpeaches/Seedling/blob/main/docs/CHANGELOG.md) file.
+Detailed change history for each release is documented in the [docs/CHANGELOG.md](https://github.com/bbpeaches/Seedling/blob/main/docs/CHANGELOG.md) file.

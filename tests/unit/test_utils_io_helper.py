@@ -1,6 +1,9 @@
-import pytest # type: ignore
+# Unit tests for Seedling-tools v2.5.
+# Copyright (c) 2026 Kaelen Chow. All rights reserved.
+
 from pathlib import Path
 from typing import List, Dict, Any
+
 from seedlingtools.utils import io_processor
 
 def test_parse_tree_topology_extract_raw_items() -> None:

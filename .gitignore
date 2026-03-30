@@ -40,21 +40,57 @@ desktop.ini
 .vscode/
 .claude/
 .idea/
+.git/
 
-# --- Seedling Generated Reports & Local Tests ---
-seedling_test_sandbox/
-seedling_test_sandbox_out/
-seedling_chaos_sandbox/
-seedling_chaos_sandbox_out/
+# --- Seedling Generated Reports & Output ---
+seedling_repo_*/
 Seedling*.md
 Seedling*.txt
 Seedling*.png
-*_search_*.md
-*_search_*.txt
+Seedling*.json
+Seedling*.xml
+*_analysis.*
+/*_skeleton.*
+*_grep.*
+*_search_*.*
+reports/
+output_report.md
+security_report.md
+*prompt.md
+*prompt.txt
+
+# --- Seedling Test Sandboxes & Artifacts ---
+seedling_test_sandbox/
+seedling_test_out/
+seedling_chaos_sandbox/
+seedling_chaos_sandbox_out/
 test_output/
 *_out/
+safe_build/
+valid_build/
+smart_build/
+direct_create_file.py
+binary_test.md
+symlink_test.md
+basic_scan.txt
+anchoring_test.md
+type_py.md
+include_py.md
+search_exact.md
+search_full_report.md
+grep_results.md
+skeleton.md
+json_output.json
+json_full.json
+xml_output.xml
+xml_full.xml
+template_output.md
+token_test.txt
+huge.png
 
 # --- Python Tools / Typing ---
+node_modules/
+target/
 .mypy_cache/
 .tox/
 .coverage

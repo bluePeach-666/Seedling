@@ -1,7 +1,9 @@
+# Unit tests for Seedling-tools v2.5.
+# Copyright (c) 2026 Kaelen Chow. All rights reserved.
+
 from __future__ import annotations
-import pytest # type: ignore
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List
 from unittest.mock import MagicMock, patch
 
 from seedlingtools.core import ScanConfig, TraversalResult, TraversalItem
@@ -20,18 +22,28 @@ def _create_mock_item(name: str, is_dir: bool, depth: int) -> TraversalItem:
         depth=depth
     )
 
-def test_analyzer_plugin_detects_nodejs_dependencies() -> None:
+def test_analyzer_plugin_detects_nodejs_dependencies(tmp_path: Path) -> None:
     plugin: AnalyzerPlugin = AnalyzerPlugin()
     result: TraversalResult = TraversalResult()
     
-    pkg_item: TraversalItem = _create_mock_item("package.json", is_dir=False, depth=1)
+    mock_json: str = '{"dependencies": {"react": "^18.0.0"}, "devDependencies": {"jest": "^29.0.0"}}'
+    
+    pkg_path = tmp_path / "package.json"
+    pkg_path.write_text(mock_json, encoding='utf-8')
+    
+    pkg_item: TraversalItem = TraversalItem(
+        path=pkg_path,
+        relative_path=Path("package.json"),
+        is_dir=False,
+        is_symlink=False,
+        depth=1
+    )
     result.items.append(pkg_item)
     result.text_files.append(pkg_item)
     
-    mock_json: str = '{"dependencies": {"react": "^18.0.0"}, "devDependencies": {"jest": "^29.0.0"}}'
     result._content_cache[pkg_item.path] = mock_json
     
-    analysis: ProjectAnalysis = plugin._analyze(result)
+    analysis: ProjectAnalysis = plugin._analyze(tmp_path, result)
     
     assert analysis.project_type == "node"
     assert "react" in analysis.dependencies.get("direct", [])

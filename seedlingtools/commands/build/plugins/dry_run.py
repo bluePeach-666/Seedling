@@ -6,8 +6,6 @@ from ....utils import logger, io_processor, terminal
 from ..base import AbstractBuildPlugin
 
 class DryRunPlugin(AbstractBuildPlugin):
-    """在物理构建前进行无冲突模拟"""
-
     def execute(self, parsed_items: List[Dict[str, Any]], contents: Dict[str, Tuple[Path, str]], target_path: Path) -> bool:
         logger.info(f"--- [CHECK MODE] Blueprint Validation for: {target_path} ---")
         missing: Set[str] = set()
@@ -18,12 +16,12 @@ class DryRunPlugin(AbstractBuildPlugin):
             p: Path = item['safe_path']
             rel: str = item['safe_path'].relative_to(target_path).as_posix()
             
-            if not p.exists():
+            if p.exists() is False:
                 missing.add(rel)
             else:
-                if not item['is_dir']:
+                if item['is_dir'] is False:
                     if rel not in contents:
-                        if io_processor.compare_file_content(p, ""):
+                        if io_processor.compare_file_content(p, "") is True:
                             modified.add(rel)
                         else:
                             identical.add(rel)
@@ -33,28 +31,31 @@ class DryRunPlugin(AbstractBuildPlugin):
                     identical.add(rel)
 
         for rel, data in contents.items():
-            p: Path = data[0]
-            content: str = data[1]
+            p_content: Path = data[0]
+            content_str: str = data[1]
             
-            if not p.exists():
+            if p_content.exists() is False:
                 missing.add(rel)
             else:
-                if io_processor.compare_file_content(p, content):
+                if io_processor.compare_file_content(p_content, content_str) is True:
                     modified.add(rel)
                 else:
                     identical.add(rel)
 
         logger.info(f"  Status: {len(identical)} identical, {len(modified)} modified, {len(missing)} missing.")
         
-        if modified:
+        if len(modified) > 0:
             logger.warning("Mismatched Files:")
-            for m in sorted(modified):
+            sorted_modified: List[str] = sorted(list(modified))
+            for m in sorted_modified:
                 logger.warning(f"      ~ {m}")
         
-        if not missing:
-            if not modified:
+        if len(missing) == 0:
+            if len(modified) == 0:
                 logger.info("Structure is up to date. No build required.")
-                return False  # 一切正常，主动阻断后续构建流程
+                return False
 
-        proceed: bool = terminal.prompt_confirmation("Proceed to build/overwrite? [y/n]: ")
+        prompt_text: str = "Proceed to build/overwrite? [y/n]: "
+        proceed: bool = terminal.prompt_confirmation(prompt_text)
+        
         return proceed

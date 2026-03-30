@@ -33,13 +33,16 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        pip install pytest
         pip install -e .
 
-    - name: Run Ultimate Test Suite
+    - name: Run Full Test Suite (UT + E2E)
       shell: bash 
       run: |
-        perl -pi -e 's/\r$//' test_suite.sh
+        find . -name "*.sh" -type f -exec perl -pi -e 's/\r$//' {} +
+        
+        chmod +x test.sh tests/e2e/*.sh
         
         export PATH="$HOME/.local/bin:$PATH"
         
-        bash test_suite.sh
+        bash test.sh

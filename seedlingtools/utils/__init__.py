@@ -1,7 +1,6 @@
 """
 The underlying tool chain and infrastructure of the Seedling-tools.  
 Copyright (c) 2026 Kaelen Chow. All rights reserved.  
-版权所有 © 2026 周珈民。保留一切权利。
 """
 
 from __future__ import annotations
@@ -12,6 +11,7 @@ from .exceptions import (
     ConfigurationError
 )
 from .constants import FileSettings
+from .patterns import SingletonMeta
 from .sysinfo import (
     get_package_version,
     get_recursion_limit,
@@ -22,6 +22,7 @@ from .log_helper import AbstractLogger, logger
 from .term_helper import AbstractTerminal, terminal
 from .io_helper import AbstractIOProcessor, io_processor
 from .image_helper import AbstractImageRenderer, image_renderer
+from .git_helper import AbstractGitHelper, gitter
 
 __all__ = [
     "SeedlingToolsError",
@@ -37,8 +38,11 @@ __all__ = [
     "AbstractTerminal",
     "AbstractIOProcessor",
     "AbstractImageRenderer",
+    "AbstractGitHelper",
     "logger",
     "terminal",
     "io_processor",
-    "image_renderer"
+    "image_renderer",
+    "gitter",
+    "SingletonMeta"
 ]
