@@ -39,13 +39,10 @@ jobs:
     - name: Run Full Test Suite (UT + E2E)
       shell: bash 
       run: |
-        # 批量清理所有 shell 脚本的 Windows CRLF 换行符
         find . -name "*.sh" -type f -exec perl -pi -e 's/\r$//' {} +
         
-        # 赋予入口脚本和所有子测试模块执行权限 (适配 Linux/macOS)
         chmod +x test.sh tests/e2e/*.sh
         
         export PATH="$HOME/.local/bin:$PATH"
         
-        # 执行全新的双阶段测试总入口
         bash test.sh
