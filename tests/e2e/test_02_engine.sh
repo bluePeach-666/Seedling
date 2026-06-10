@@ -50,6 +50,46 @@ if [ -f "$OUT_DIR/smart_build/__init__.py" ] || ! grep -q "I am nested" "$OUT_DI
     exit 1
 fi
 
+echo -e "  -> Testing ENGINE: Visual Tree Noise Sanitization..."
+cat << 'EOF' > "$TEST_DIR/glyph_noise_blueprint.md"
+```text
+root/
+├── src/
+│
+│   ├── │literal.txt
+│   └── normal.txt
+│
+└── glyph│name.txt
+```
+### FILE: src/│literal.txt
+```text
+leading glyph kept
+```
+### FILE: glyph│name.txt
+```text
+embedded glyph kept
+```
+EOF
+set +e
+build "$TEST_DIR/glyph_noise_blueprint.md" "$OUT_DIR/glyph_noise_build" >/dev/null 2>&1
+set -e
+if [ -e "$OUT_DIR/glyph_noise_build/│" ] || [ -e "$OUT_DIR/glyph_noise_build/src/│" ]; then
+    echo -e "${RED}Visual connector noise was materialized as a filesystem node.${NC}"
+    exit 1
+fi
+if [ ! -f "$OUT_DIR/glyph_noise_build/src/│literal.txt" ] || [ ! -f "$OUT_DIR/glyph_noise_build/glyph│name.txt" ]; then
+    echo -e "${RED}Valid glyph-bearing filenames were not reconstructed.${NC}"
+    exit 1
+fi
+if ! grep -q "leading glyph kept" "$OUT_DIR/glyph_noise_build/src/│literal.txt"; then
+    echo -e "${RED}Glyph-leading file content was not aligned.${NC}"
+    exit 1
+fi
+if ! grep -q "embedded glyph kept" "$OUT_DIR/glyph_noise_build/glyph│name.txt"; then
+    echo -e "${RED}Embedded glyph file content was not aligned.${NC}"
+    exit 1
+fi
+
 echo -e "  -> Testing ENGINE: Direct Creation Flag (-d)..."
 set +e
 build -d "$OUT_DIR/direct_create_file.py" >/dev/null 2>&1

@@ -43,6 +43,68 @@ def test_parse_tree_topology_implicit_directory_inference() -> None:
     assert folder_node['is_dir'] is True 
 
 
+def test_parse_tree_topology_ignores_visual_connector_noise() -> None:
+    tree_lines: List[str] = [
+        "root/",
+        "├── src/",
+        "│",
+        "│   │",
+        "│   ├── app.py",
+        "└── README.md"
+    ]
+
+    raw_items: List[Dict[str, Any]] = io_processor.parse_tree_topology(tree_lines)
+
+    names: List[str] = []
+    for item in raw_items:
+        names.append(item['name'])
+
+    assert names == ["root", "src", "app.py", "README.md"]
+
+
+def test_parse_tree_topology_preserves_valid_glyph_names() -> None:
+    tree_lines: List[str] = [
+        "root/",
+        "├── notes│2026.md",
+        "├── glyph─name.txt",
+        "├── branch├marker.py",
+        "├── │literal-pipe.txt",
+        "├── └literal-corner.txt",
+        "└── ├──test.py"
+    ]
+
+    raw_items: List[Dict[str, Any]] = io_processor.parse_tree_topology(tree_lines)
+
+    names: List[str] = []
+    for item in raw_items:
+        names.append(item['name'])
+
+    assert "notes│2026.md" in names
+    assert "glyph─name.txt" in names
+    assert "branch├marker.py" in names
+    assert "│literal-pipe.txt" in names
+    assert "└literal-corner.txt" in names
+    assert "├──test.py" in names
+
+
+def test_parse_tree_topology_rejects_malformed_visual_prefixes() -> None:
+    tree_lines: List[str] = [
+        "root/",
+        "│ ├── bad.txt",
+        "└─ also_bad.txt",
+        "─ bad_again.txt",
+        "└── good.txt"
+    ]
+
+    raw_items: List[Dict[str, Any]] = io_processor.parse_tree_topology(tree_lines)
+
+    names: List[str] = []
+    for item in raw_items:
+        names.append(item['name'])
+
+    assert names == ["root", "good.txt"]
+
+
 def test_io_processor_compare_file_content(tmp_path: Path) -> None:
     file_path: Path = tmp_path / "test.txt"
     

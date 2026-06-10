@@ -54,9 +54,45 @@ class FileSystemError(SeedlingToolsError):
 
 class ConfigurationError(SeedlingToolsError):
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         hint: Optional[str] = "Verify the CLI arguments or config file syntax.",
         **kwargs: Any
     ) -> None:
         super().__init__(message, exit_code=64, hint=hint, **kwargs)
+
+class ConfigurationLoadError(ConfigurationError):
+    def __init__(
+        self,
+        message: str,
+        hint: Optional[str] = "Check that the configuration path exists and is readable.",
+        **kwargs: Any
+    ) -> None:
+        super().__init__(message=message, hint=hint, **kwargs)
+
+class ConfigurationCorruptionError(ConfigurationError):
+    def __init__(
+        self,
+        message: str,
+        hint: Optional[str] = "Fix or remove the malformed Seedling configuration file.",
+        **kwargs: Any
+    ) -> None:
+        super().__init__(message=message, hint=hint, **kwargs)
+
+class ConfigurationWriteError(ConfigurationError):
+    def __init__(
+        self,
+        message: str,
+        hint: Optional[str] = "Check permissions for the Seedling configuration directory.",
+        **kwargs: Any
+    ) -> None:
+        super().__init__(message=message, hint=hint, **kwargs)
+
+class PluginLoadError(SeedlingToolsError):
+    def __init__(
+        self,
+        message: str,
+        hint: Optional[str] = "Check the custom command plugin implementation.",
+        **kwargs: Any
+    ) -> None:
+        super().__init__(message, exit_code=65, hint=hint, **kwargs)

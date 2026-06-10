@@ -72,6 +72,52 @@ def test_local_fs_executor_force_mode(tmp_path: Path) -> None:
     assert conflict_file.read_text(encoding="utf-8") == "NEW CONTENT"
 
 
+def test_text_blueprint_parser_ignores_visual_noise_and_preserves_glyph_names(tmp_path: Path) -> None:
+    parser: TextBlueprintParser = TextBlueprintParser()
+    target_path: Path = (tmp_path / "target").resolve()
+    target_path.mkdir()
+
+    blueprint_file: Path = tmp_path / "glyph_noise_blueprint.md"
+    blueprint_file.write_text(
+        "```text\n"
+        "root/\n"
+        "├── src/\n"
+        "│\n"
+        "│   ├── │literal.txt\n"
+        "│   └── normal.txt\n"
+        "│\n"
+        "└── glyph│name.txt\n"
+        "```\n"
+        "### FILE: src/│literal.txt\n"
+        "```text\n"
+        "leading glyph kept\n"
+        "```\n"
+        "### FILE: glyph│name.txt\n"
+        "```text\n"
+        "embedded glyph kept\n"
+        "```\n",
+        encoding="utf-8"
+    )
+
+    parsed_items: List[Dict[str, Any]]
+    safe_contents: Dict[str, Tuple[Path, str]]
+    parsed_items, safe_contents = parser.parse(blueprint_file, target_path)
+
+    relative_paths: List[str] = []
+    for item in parsed_items:
+        item_path: Path = item['safe_path']
+        relative_paths.append(item_path.relative_to(target_path).as_posix())
+        assert "│" not in item_path.relative_to(target_path).parts
+
+    assert "src/│literal.txt" in relative_paths
+    assert "src/normal.txt" in relative_paths
+    assert "glyph│name.txt" in relative_paths
+    assert "src/│literal.txt" in safe_contents
+    assert "glyph│name.txt" in safe_contents
+    assert safe_contents["src/│literal.txt"][1] == "leading glyph kept\n"
+    assert safe_contents["glyph│name.txt"][1] == "embedded glyph kept\n"
+
+
 @patch("seedlingtools.commands.build.executors.local_fs.terminal.prompt_confirmation")
 def test_local_fs_executor_normal_mode_declined(mock_prompt: MagicMock, tmp_path: Path) -> None:
     executor: LocalFSExecutor = LocalFSExecutor()

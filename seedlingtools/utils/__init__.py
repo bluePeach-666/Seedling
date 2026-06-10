@@ -8,7 +8,11 @@ from .exceptions import (
     SeedlingToolsError,
     SystemProbeError,
     FileSystemError,
-    ConfigurationError
+    ConfigurationError,
+    ConfigurationLoadError,
+    ConfigurationCorruptionError,
+    ConfigurationWriteError,
+    PluginLoadError
 )
 from .constants import FileSettings
 from .patterns import SingletonMeta
@@ -29,6 +33,10 @@ __all__ = [
     "SystemProbeError",
     "FileSystemError",
     "ConfigurationError",
+    "ConfigurationLoadError",
+    "ConfigurationCorruptionError",
+    "ConfigurationWriteError",
+    "PluginLoadError",
     "FileSettings",
     "get_package_version",
     "get_recursion_limit",

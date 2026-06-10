@@ -75,6 +75,105 @@ class LocalFileSystemIO(AbstractIOProcessor, metaclass=SingletonMeta):
                     max_ticks = ticks
         return '`' * (max_ticks + 1)
 
+    def _is_tree_drawing_noise(self, line: str) -> bool:
+        stripped: str = line.strip()
+        if len(stripped) == 0:
+            return False
+
+        allowed_chars: Tuple[str, ...] = ('│', '├', '└', '─', ' ', '\t')
+        for char in stripped:
+            if char not in allowed_chars:
+                return False
+
+        return True
+
+    def _split_tree_row(self, line: str) -> Optional[Tuple[int, str]]:
+        line_without_tail: str = line.rstrip()
+        if len(line_without_tail) == 0:
+            return None
+
+        if self._is_tree_drawing_noise(line_without_tail) is True:
+            return None
+
+        cursor: int = 0
+        indent_units: int = 0
+        has_tree_indent: bool = False
+
+        while cursor < len(line_without_tail):
+            if line_without_tail.startswith('│   ', cursor) is True:
+                cursor += 4
+                indent_units += 1
+                has_tree_indent = True
+            elif line_without_tail.startswith('    ', cursor) is True:
+                cursor += 4
+                indent_units += 1
+            else:
+                break
+
+        has_branch: bool = False
+        if line_without_tail.startswith('├──', cursor) is True:
+            has_branch = True
+        elif line_without_tail.startswith('└──', cursor) is True:
+            has_branch = True
+
+        if has_branch is True:
+            content_start: int = cursor + 3
+            content: str = line_without_tail[content_start:]
+            if content.startswith(' ') is True:
+                content = content[1:]
+            if len(content.strip()) == 0:
+                return None
+            return indent_units + 1, content
+
+        if has_tree_indent is True:
+            return None
+
+        content = line_without_tail[cursor:]
+        if len(content.strip()) == 0:
+            return None
+
+        lstripped_content: str = content.lstrip()
+        tree_prefix_chars: Tuple[str, ...] = ('│', '├', '└', '─')
+        for tree_char in tree_prefix_chars:
+            if lstripped_content.startswith(tree_char) is True:
+                return None
+
+        return indent_units, content.strip()
+
+    def _is_structural_tree_row(self, line: str) -> bool:
+        line_without_tail: str = line.rstrip()
+        cursor: int = 0
+
+        while cursor < len(line_without_tail):
+            if line_without_tail.startswith('│   ', cursor) is True:
+                cursor += 4
+            elif line_without_tail.startswith('    ', cursor) is True:
+                cursor += 4
+            else:
+                break
+
+        if line_without_tail.startswith('├──', cursor) is True:
+            if self._split_tree_row(line_without_tail) is not None:
+                return True
+        elif line_without_tail.startswith('└──', cursor) is True:
+            if self._split_tree_row(line_without_tail) is not None:
+                return True
+
+        return False
+
+    def _has_following_structural_tree_row(self, lines: List[str], start_index: int) -> bool:
+        for i in range(start_index, len(lines)):
+            candidate: str = lines[i].rstrip()
+            if len(candidate) == 0:
+                continue
+            if candidate.startswith('```') is True:
+                continue
+            if self._is_tree_drawing_noise(candidate) is True:
+                continue
+            return self._is_structural_tree_row(candidate)
+
+        return False
+
     def parse_directory_tree(self, file_path: Path) -> List[str]:
         lines: List[str] = []
         try:
@@ -88,45 +187,53 @@ class LocalFileSystemIO(AbstractIOProcessor, metaclass=SingletonMeta):
 
         tree_lines: List[str] = []
         in_tree: bool = False
-        tree_chars: Final[Tuple[str, ...]] = ('├──', '└──', '│')
 
         for i, line in enumerate(lines):
             stripped: str = line.rstrip()
             if len(stripped) == 0:
+                continue
+
+            if stripped.startswith('```') is True:
                 if in_tree is True:
                     break
                 else:
                     continue
-                
-            has_tree_chars: bool = False
-            for c in tree_chars:
-                if c in line:
-                    has_tree_chars = True
+
+            if stripped.startswith('### FILE: ') is True:
+                if in_tree is True:
                     break
-                    
-            next_has_tree_chars: bool = False
-            if (i + 1) < len(lines):
-                for c in tree_chars:
-                    if c in lines[i+1]:
-                        next_has_tree_chars = True
-                        break
-                
-            if has_tree_chars is True:
-                in_tree = True
-                if stripped.startswith('```') is False: 
-                    tree_lines.append(stripped)
-            else:
-                if in_tree is False:
-                    if next_has_tree_chars is True:
-                        in_tree = True
-                        if stripped.startswith('```') is False: 
-                            tree_lines.append(stripped)
                 else:
-                    if stripped.startswith('```'):
-                        break
-                    else:
-                        break
-                    
+                    continue
+
+            is_noise: bool = self._is_tree_drawing_noise(stripped)
+            is_structural_row: bool = self._is_structural_tree_row(stripped)
+            split_row: Optional[Tuple[int, str]] = self._split_tree_row(stripped)
+
+            if in_tree is True:
+                if is_noise is True:
+                    continue
+                if is_structural_row is True:
+                    tree_lines.append(stripped)
+                    continue
+                if split_row is not None:
+                    if split_row[0] > 0:
+                        tree_lines.append(stripped)
+                        continue
+                first_char: str = stripped[0]
+                if first_char in ('│', '├', '└', '─'):
+                    continue
+                break
+            else:
+                if is_structural_row is True:
+                    in_tree = True
+                    tree_lines.append(stripped)
+                    continue
+                if split_row is not None:
+                    if self._has_following_structural_tree_row(lines, i + 1) is True:
+                        in_tree = True
+                        tree_lines.append(stripped)
+                        continue
+
         return tree_lines
 
     def deserialize_fenced_blocks(self, file_path: Path) -> Dict[str, str]:
@@ -254,36 +361,33 @@ class LocalFileSystemIO(AbstractIOProcessor, metaclass=SingletonMeta):
 
     def parse_tree_topology(self, tree_lines: List[str]) -> List[Dict[str, Any]]:
         raw_items: List[Dict[str, Any]] = []
-        
+
         for line in tree_lines:
-            match: Optional[re.Match[str]] = re.match(r'^([│├└─\s]*)(.+)$', line)
-            if match is None:
+            split_row: Optional[Tuple[int, str]] = self._split_tree_row(line)
+            if split_row is None:
                 continue
-                
-            prefix: str = match.group(1)
-            content: str = match.group(2)
-            
-            clean_prefix: str = prefix.replace('│', ' ').replace('├', ' ').replace('└', ' ').replace('─', ' ')
-            depth: int = len(clean_prefix) // 4
-            
+
+            depth: int = split_row[0]
+            content: str = split_row[1]
+
             content_parts: List[str] = content.split('<-')
             clean_name: str = content_parts[0].strip()
-            
+
             name_parts: List[str] = re.split(r'\s{2,}#', clean_name)
             clean_name = name_parts[0].strip()
-            
+
             is_dir: bool = False
-            
+
             if clean_name.endswith('/'):
                 is_dir = True
                 clean_name = clean_name.rstrip('/')
-                
+
             if len(clean_name) > 0:
                 if clean_name != '.':
                     if clean_name != '..':
                         item_dict: Dict[str, Any] = {
-                            'depth': depth, 
-                            'name': clean_name, 
+                            'depth': depth,
+                            'name': clean_name,
                             'is_dir': is_dir
                         }
                         raw_items.append(item_dict)
@@ -292,10 +396,10 @@ class LocalFileSystemIO(AbstractIOProcessor, metaclass=SingletonMeta):
         for i in range(item_count - 1):
             current_depth: int = raw_items[i]['depth']
             next_depth: int = raw_items[i + 1]['depth']
-            
+
             if next_depth > current_depth:
                 raw_items[i]['is_dir'] = True
-        
+
         return raw_items
     
     def compare_file_content(self, path: Path, expected_content: str) -> bool:

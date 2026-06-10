@@ -43,5 +43,10 @@ Issues = "https://github.com/bbpeaches/Seedling/issues"
 Changelog = "https://github.com/bbpeaches/Seedling/blob/main/CHANGELOG.md"
 
 [project.scripts]
+seedling = "seedlingtools.main:main"
 scan = "seedlingtools.main:scan"
 build = "seedlingtools.main:build"
+clean = "seedlingtools.main:clean"
+
+[tool.setuptools.packages.find]
+include = ["seedlingtools*"]

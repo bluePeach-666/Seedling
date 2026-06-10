@@ -5,6 +5,11 @@ Copyright (c) 2026 Kaelen Chow. All rights reserved.
 
 from __future__ import annotations
 from .config import ScanConfig
+from .config_manager import (
+    AbstractConfigManager,
+    SeedlingConfigManager,
+    config_manager
+)
 from .patterns import (
     AbstractMatcherEngine,
     CoreMatcherEngine,
@@ -21,6 +26,9 @@ from .traversal import (
 
 __all__ = [
     "ScanConfig",
+    "AbstractConfigManager",
+    "SeedlingConfigManager",
+    "config_manager",
     "AbstractMatcherEngine",
     "CoreMatcherEngine",
     "matcher_engine",
