@@ -12,7 +12,7 @@ from typing import List, Optional, Dict, Any
 from .helper import expand_scan_excludes, intercept_garbage_files
 from .explorer import ScanOrchestrator
 from .exporters import TextExporter, JsonExporter, XmlExporter
-from .plugins import AnalyzerPlugin, ContextInjectorPlugin, GrepPlugin, SearchPlugin, SkeletonPlugin
+from .plugins import AnalyzerPlugin, ContextInjectorPlugin, GrepPlugin, SearchPlugin, SkeletonPlugin, StripCommentsPlugin
 from .base import AbstractScanPlugin, AbstractExporter
 from ...core import ScanConfig, DepthFirstTraverser, TraversalResult, config_manager
 from ...utils import (
@@ -36,7 +36,8 @@ __all__ = [
     "ContextInjectorPlugin",
     "GrepPlugin",
     "SearchPlugin",
-    "SkeletonPlugin"
+    "SkeletonPlugin",
+    "StripCommentsPlugin"
 ]
 
 def setup_scan_parser(parser: argparse.ArgumentParser) -> None:
@@ -66,6 +67,7 @@ def setup_scan_parser(parser: argparse.ArgumentParser) -> None:
     
     parser.add_argument("--analyze", action="store_true", help="Analyze project structure and dependencies")
     parser.add_argument("--template", type=str, default=None, help="Provide a prompt template file for LLM context aggregation")
+    parser.add_argument("--strip-comments", action="store_true", default=None, help="Strip comments from exported source content")
     
     output_mode = parser.add_mutually_exclusive_group()
     output_mode.add_argument("--full", action="store_true", help="Gather full text content of scanned files.")
@@ -179,7 +181,8 @@ def handle_scan(args: argparse.Namespace) -> None:
             quiet=quiet_flag,
             use_regex=config.use_regex,
             ignore_case=config.ignore_case,
-            template_path=config.template_path
+            template_path=config.template_path,
+            strip_comments=config.strip_comments
         )
 
         if quiet_flag is False:
@@ -219,6 +222,8 @@ def handle_scan(args: argparse.Namespace) -> None:
             
         if args.skeleton is True:
             orchestrator.add_plugin(SkeletonPlugin())
+        elif config.strip_comments is True:
+            orchestrator.add_plugin(StripCommentsPlugin())
             
         if args.find is not None:
             if len(args.find) > 0:

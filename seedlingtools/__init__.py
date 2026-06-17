@@ -10,7 +10,7 @@ from .core import ScanConfig, TraversalResult, TraversalItem
 from .utils import get_package_version
 
 __version__ = get_package_version()
-__author__ = "周珈民 (Kaelen Chow)"
+__author__ = "Kaelen"
 __name__ = "Seedling-tools"
 
 __all__ = [

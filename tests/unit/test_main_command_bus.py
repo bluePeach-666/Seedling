@@ -4,7 +4,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import patch
 
 import pytest #type: ignore
@@ -61,6 +61,9 @@ def test_seedling_root_help_includes_builtin_commands(capsys: Any) -> None:
     assert "scan" in captured.out
     assert "build" in captured.out
     assert "clean" in captured.out
+    assert "config" in captured.out
+    assert "strip-comments" in captured.out
+    assert "tools" in captured.out
 
 
 def test_seedling_help_includes_loaded_plugin(tmp_path: Path, capsys: Any) -> None:
@@ -122,6 +125,55 @@ def test_dispatch_invokes_plugin_execute(tmp_path: Path, capsys: Any) -> None:
 
     captured = capsys.readouterr()
     assert "custom audit ci" in captured.out
+
+
+def test_config_show_prints_preferences_json(capsys: Any) -> None:
+    with patch("sys.argv", ["seedling", "config", "show"]):
+        seedling_main.main()
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["output_format"] is None
+    assert payload["common_excludes"] == []
+
+
+def test_config_set_and_unset_round_trip(capsys: Any) -> None:
+    with patch("sys.argv", ["seedling", "config", "set", "output_format", "json"]):
+        seedling_main.main()
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["output_format"] == "json"
+
+    with patch("sys.argv", ["seedling", "config", "unset", "output_format"]):
+        seedling_main.main()
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["output_format"] is None
+
+
+def test_config_reset_restores_defaults(capsys: Any) -> None:
+    with patch("sys.argv", ["seedling", "config", "set", "show_hidden", "true"]):
+        seedling_main.main()
+    _ = capsys.readouterr()
+
+    with patch("sys.argv", ["seedling", "config", "reset"]):
+        seedling_main.main()
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["show_hidden"] is None
+
+
+def test_strip_comments_check_reports_token_savings(tmp_path: Path, capsys: Any) -> None:
+    source_file: Path = tmp_path / "example.py"
+    source_file.write_text("# remove\nvalue = 1\n", encoding="utf-8")
+
+    with patch("sys.argv", ["seedling", "strip-comments", str(source_file), "--check"]):
+        seedling_main.main()
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["path"] == str(source_file)
+    assert "saved_tokens" in payload
 
 
 def test_unknown_seedling_command_exits_with_argparse_error() -> None:

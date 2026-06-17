@@ -16,11 +16,11 @@ from .core import config_manager
 from .commands.scan import setup_scan_parser, handle_scan
 from .commands.build import setup_build_parser, handle_build
 from .commands.clean import setup_clean_parser, handle_clean
-from .commands.cli import BUILTIN_COMMANDS, command_registry, load_command_plugins
+from .commands.cli import BUILTIN_COMMANDS, command_registry, load_command_plugins, register_generated_tools
 
-def _initialize_config(cwd: Path) -> None:
+def _initialize_config(cwd: Path, quiet_init: bool = False) -> None:
     logger.configure(verbose=False, quiet=False)
-    config_manager.initialize(cwd=cwd)
+    config_manager.initialize(cwd=cwd, quiet_init=quiet_init)
     atexit.register(config_manager.save)
 
 
@@ -50,6 +50,7 @@ def _load_configured_command_plugins() -> None:
             plugin_dirs.append(str(raw_dir))
 
     load_command_plugins(plugin_dirs, command_registry, strict=strict)
+    register_generated_tools(Path.cwd(), command_registry)
 
 
 def _build_root_parser() -> argparse.ArgumentParser:
@@ -79,7 +80,7 @@ def main() -> None:
     terminal.configure_environment()
 
     try:
-        _initialize_config(Path.cwd())
+        _initialize_config(Path.cwd(), quiet_init=True)
         _register_builtin_commands()
         _load_configured_command_plugins()
         parser: argparse.ArgumentParser = _build_root_parser()

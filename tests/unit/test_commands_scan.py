@@ -14,6 +14,7 @@ from seedlingtools import (
 from seedlingtools.commands.scan.explorer import ScanOrchestrator
 from seedlingtools.commands.scan.plugins.grep import GrepPlugin, GrepMatch
 from seedlingtools.commands.scan.plugins.analyzer import AnalyzerPlugin, ProjectAnalysis
+from seedlingtools.commands.scan.plugins.strip_comments import StripCommentsPlugin
 from seedlingtools.commands.scan.exporters.json_output import JsonExporter
 from seedlingtools.core.traversal import DepthFirstTraverser
 from seedlingtools.commands.scan.helper import intercept_garbage_files
@@ -72,16 +73,40 @@ def test_orchestrator_pipeline(tmp_path: Path, sample_project: Path) -> None:
     config: ScanConfig = ScanConfig()
     traverser: DepthFirstTraverser = DepthFirstTraverser()
     result: TraversalResult = traverser.traverse(sample_project, config)
-    
+
     out_file: Path = tmp_path / "output.json"
     exporter: JsonExporter = JsonExporter()
     orchestrator: ScanOrchestrator = ScanOrchestrator(exporter=exporter)
-    
+
     # 执行物理构建管线
     orchestrator.run_pipeline(sample_project, config, result, out_file=out_file)
-    
+
     assert out_file.exists() is True
     assert out_file.is_file() is True
+
+
+def test_strip_comments_plugin_writes_report(tmp_path: Path) -> None:
+    project_path: Path = tmp_path / "project"
+    project_path.mkdir()
+    source_file: Path = project_path / "sample.py"
+    source_file.write_text(
+        "# remove\n"
+        "value = '# keep'\n",
+        encoding="utf-8"
+    )
+
+    config: ScanConfig = ScanConfig(strip_comments=True)
+    traverser: DepthFirstTraverser = DepthFirstTraverser()
+    result: TraversalResult = traverser.traverse(project_path, config, collect_content=True)
+    out_file: Path = tmp_path / "stripped.md"
+
+    plugin = StripCommentsPlugin()
+    plugin.execute(project_path, config, result, out_file=out_file)
+
+    content = out_file.read_text(encoding="utf-8")
+    assert "# Comment Stripping Report" in content
+    assert "# remove" not in content
+    assert "'# keep'" in content
 
 def test_garbage_interception_non_interactive(sample_project: Path) -> None:
     """

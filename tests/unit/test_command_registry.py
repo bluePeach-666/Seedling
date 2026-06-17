@@ -66,6 +66,9 @@ def test_builtin_commands_register_by_default() -> None:
     assert "scan" in command_names
     assert "build" in command_names
     assert "clean" in command_names
+    assert "config" in command_names
+    assert "strip-comments" in command_names
+    assert "tools" in command_names
 
 
 def test_valid_plugin_module_registers_command(tmp_path: Path) -> None:

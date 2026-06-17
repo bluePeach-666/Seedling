@@ -9,6 +9,25 @@ export YELLOW='\033[0;33m'
 export NC='\033[0m'
 
 export PATH="$HOME/.local/bin:$USERPROFILE/.local/bin:$PATH"
+REPO_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../.." && pwd )"
+COMMON_PYTHON_BIN="${COMMON_PYTHON_BIN:-/Users/kaelenchow/Public/DeskFile/MyCode/.venv/venv_common/bin/python3}"
+
+scan() {
+    PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" "$COMMON_PYTHON_BIN" -c 'from seedlingtools.main import scan; scan()' "$@"
+}
+
+build() {
+    PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" "$COMMON_PYTHON_BIN" -c 'from seedlingtools.main import build; build()' "$@"
+}
+
+clean() {
+    PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" "$COMMON_PYTHON_BIN" -c 'from seedlingtools.main import clean; clean()' "$@"
+}
+
+seedling() {
+    PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" "$COMMON_PYTHON_BIN" -c 'from seedlingtools.main import main; main()' "$@"
+}
+
 export TEST_DIR="$HOME/tmp/seedling_test_sandbox"
 export OUT_DIR="$HOME/tmp/seedling_test_out"
 
@@ -26,7 +45,7 @@ setup_sandbox() {
     echo "# My Awesome App" > "$TEST_DIR/README.md"
     echo "fake_binary" > "$TEST_DIR/image.png"
     printf "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" > "$TEST_DIR/real_binary.png"
-    
+
     set +e
     ln -s "$TEST_DIR/nowhere.txt" "$TEST_DIR/broken_link.txt" 2>/dev/null
     set -e

@@ -3,11 +3,15 @@
 
 from __future__ import annotations
 import argparse
+import json
 from pathlib import Path
 from typing import List
 
+import pytest #type: ignore
+
 from seedlingtools.commands.clean import handle_clean
 from seedlingtools.commands.clean import _collect_cleanup_targets
+from seedlingtools.utils import CleanRiskError, ConfigurationError
 
 
 def _create_cache_project(tmp_path: Path) -> Path:
@@ -55,7 +59,19 @@ def _create_cache_project(tmp_path: Path) -> Path:
     node_cache_file: Path = node_modules_path / "ignored.pyc"
     node_cache_file.write_bytes(b"ignored")
 
+    next_cache_path: Path = project_path / ".next"
+    next_cache_path.mkdir()
+    next_file: Path = next_cache_path / "cache.txt"
+    next_file.write_text("node\n", encoding="utf-8")
+
     return project_path
+
+
+def _write_clean_config(home_path: Path, payload: dict) -> None:
+    config_dir: Path = home_path / ".seedling"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file: Path = config_dir / "config.json"
+    config_file.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_collect_cleanup_targets_keeps_nested_build_directory(tmp_path: Path) -> None:
@@ -83,9 +99,13 @@ def test_collect_cleanup_targets_keeps_nested_build_directory(tmp_path: Path) ->
     assert Path(".coverage") in relative_files
 
 
-def test_handle_clean_dry_run_preserves_targets(tmp_path: Path) -> None:
+def test_handle_clean_dry_run_preserves_targets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home_path: Path = tmp_path / "home"
+    home_path.mkdir()
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
     project_path: Path = _create_cache_project(tmp_path)
-    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=True)
+    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=True, strategy=None)
 
     handle_clean(args)
 
@@ -95,9 +115,13 @@ def test_handle_clean_dry_run_preserves_targets(tmp_path: Path) -> None:
     assert (project_path / "src" / "main.py").exists() is True
 
 
-def test_handle_clean_removes_only_generated_artifacts(tmp_path: Path) -> None:
+def test_handle_clean_removes_only_generated_artifacts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home_path: Path = tmp_path / "home"
+    home_path.mkdir()
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
     project_path: Path = _create_cache_project(tmp_path)
-    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=False)
+    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=None, strategy=None)
 
     handle_clean(args)
 
@@ -113,12 +137,16 @@ def test_handle_clean_removes_only_generated_artifacts(tmp_path: Path) -> None:
     assert (project_path / "node_modules" / "pkg" / "__pycache__" / "ignored.pyc").exists() is True
 
 
-def test_handle_clean_noop_succeeds(tmp_path: Path) -> None:
+def test_handle_clean_noop_succeeds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home_path: Path = tmp_path / "home"
+    home_path.mkdir()
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
     project_path: Path = tmp_path / "project"
     project_path.mkdir()
     source_file: Path = project_path / "main.py"
     source_file.write_text("print('clean')\n", encoding="utf-8")
-    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=False)
+    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=None, strategy=None)
 
     handle_clean(args)
 
@@ -148,3 +176,116 @@ def test_collect_cleanup_targets_ignores_symlinked_cache(tmp_path: Path) -> None
     assert len(dirs) == 0
     assert len(files) == 0
     assert outside_file.exists() is True
+
+
+def test_handle_clean_aggressive_requires_dry_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home_path: Path = tmp_path / "home"
+    home_path.mkdir()
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
+    _write_clean_config(home_path, {"schema_version": 1, "clean": {"strategy": "aggressive"}, "state": {}})
+    project_path: Path = _create_cache_project(tmp_path)
+    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=None, strategy=None)
+
+    from seedlingtools.core.config_manager import SeedlingConfigManager
+    from seedlingtools.utils.patterns import SingletonMeta
+    if SeedlingConfigManager in SingletonMeta._instances:
+        del SingletonMeta._instances[SeedlingConfigManager]
+
+    with pytest.raises(CleanRiskError):
+        handle_clean(args)
+
+
+def test_handle_clean_node_modules_strategy_removes_node_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home_path: Path = tmp_path / "home"
+    home_path.mkdir()
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
+    _write_clean_config(home_path, {"schema_version": 1, "clean": {"strategy": "node-modules"}, "state": {}})
+    project_path: Path = _create_cache_project(tmp_path)
+    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=None, strategy=None)
+
+    from seedlingtools.core.config_manager import SeedlingConfigManager
+    from seedlingtools.utils.patterns import SingletonMeta
+    if SeedlingConfigManager in SingletonMeta._instances:
+        del SingletonMeta._instances[SeedlingConfigManager]
+
+    handle_clean(args)
+
+    assert (project_path / ".next").exists() is False
+
+
+def test_handle_clean_blocks_custom_target_outside_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home_path: Path = tmp_path / "home"
+    home_path.mkdir()
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
+    outside_path: Path = tmp_path / "outside"
+    outside_path.mkdir()
+    outside_file: Path = outside_path / "outside.pyc"
+    outside_file.write_bytes(b"outside")
+    _write_clean_config(
+        home_path,
+        {"schema_version": 1, "clean": {"custom_targets": [str(outside_file)]}, "state": {}}
+    )
+    project_path: Path = _create_cache_project(tmp_path)
+    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=True, strategy=None)
+
+    from seedlingtools.core.config_manager import SeedlingConfigManager
+    from seedlingtools.utils.patterns import SingletonMeta
+    if SeedlingConfigManager in SingletonMeta._instances:
+        del SingletonMeta._instances[SeedlingConfigManager]
+
+    with pytest.raises(CleanRiskError):
+        handle_clean(args)
+
+
+def test_handle_clean_blocks_protected_source_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home_path: Path = tmp_path / "home"
+    home_path.mkdir()
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
+    _write_clean_config(
+        home_path,
+        {"schema_version": 1, "clean": {"custom_targets": ["src"]}, "state": {}}
+    )
+    project_path: Path = _create_cache_project(tmp_path)
+    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=True, strategy=None)
+
+    from seedlingtools.core.config_manager import SeedlingConfigManager
+    from seedlingtools.utils.patterns import SingletonMeta
+    if SeedlingConfigManager in SingletonMeta._instances:
+        del SingletonMeta._instances[SeedlingConfigManager]
+
+    with pytest.raises(CleanRiskError):
+        handle_clean(args)
+
+
+def test_handle_clean_external_mode_must_be_candidates_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home_path: Path = tmp_path / "home"
+    home_path.mkdir()
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
+    script_path: Path = tmp_path / "script.py"
+    script_path.write_text("print('{}')\n", encoding="utf-8")
+    _write_clean_config(
+        home_path,
+        {
+            "schema_version": 1,
+            "clean": {
+                "external_script": str(script_path),
+                "external_mode": "execute"
+            },
+            "state": {}
+        }
+    )
+    project_path: Path = _create_cache_project(tmp_path)
+    args: argparse.Namespace = argparse.Namespace(target=str(project_path), dry_run=True, strategy=None)
+
+    from seedlingtools.core.config_manager import SeedlingConfigManager
+    from seedlingtools.utils.patterns import SingletonMeta
+    if SeedlingConfigManager in SingletonMeta._instances:
+        del SingletonMeta._instances[SeedlingConfigManager]
+
+    with pytest.raises(ConfigurationError):
+        handle_clean(args)

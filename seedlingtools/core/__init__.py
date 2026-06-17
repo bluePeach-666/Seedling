@@ -4,7 +4,8 @@ Copyright (c) 2026 Kaelen Chow. All rights reserved.
 """
 
 from __future__ import annotations
-from .config import ScanConfig
+from .comment_stripper import CommentStripper, StripCommentsResult
+from .config import BuildConfig, CleanConfig, ScanConfig
 from .config_manager import (
     AbstractConfigManager,
     SeedlingConfigManager,
@@ -25,6 +26,10 @@ from .traversal import (
 )
 
 __all__ = [
+    "CommentStripper",
+    "StripCommentsResult",
+    "BuildConfig",
+    "CleanConfig",
     "ScanConfig",
     "AbstractConfigManager",
     "SeedlingConfigManager",

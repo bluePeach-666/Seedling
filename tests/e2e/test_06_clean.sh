@@ -56,3 +56,31 @@ if [ ! -f "$TEST_DIR/node_modules/pkg/__pycache__/ignored.pyc" ]; then
     echo -e "${RED}Clean command traversed an ignored dependency directory.${NC}"
     exit 1
 fi
+
+echo -e "  -> Testing CLEAN: Aggressive Strategy Requires Dry Run..."
+CONFIG_HOME="$HOME/seedling_clean_home"
+rm -rf "$CONFIG_HOME"
+mkdir -p "$CONFIG_HOME/.seedling"
+export HOME="$CONFIG_HOME"
+export USERPROFILE="$CONFIG_HOME"
+cat << EOF > "$HOME/.seedling/config.json"
+{
+  "schema_version": 1,
+  "clean": {
+    "strategy": "aggressive"
+  },
+  "state": {}
+}
+EOF
+set +e
+OUTPUT=$("$CLEAN_BIN" "$TEST_DIR" 2>&1)
+STATUS=$?
+set -e
+if [ $STATUS -eq 0 ]; then
+    echo -e "${RED}Aggressive clean should require dry-run before deletion.${NC}"
+    exit 1
+fi
+if [[ "$OUTPUT" != *"Aggressive clean strategy requires"* ]]; then
+    echo -e "${RED}Aggressive clean failure message was not specific enough.${NC}"
+    exit 1
+fi

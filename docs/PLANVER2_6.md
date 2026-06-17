@@ -1,6 +1,6 @@
 # Seedling-tools v2.6.0 后续任务重规划
 
-更新时间：2026-06-10
+更新时间：2026-06-17
 目标版本：`2.6.0`
 
 ## 0. 版本目标与发布边界
@@ -38,6 +38,23 @@
 - 测试基线：unit + e2e 已覆盖上述能力，full suite 通过。
 
 这些能力是 v2.6.0 的地基，后续不应该推倒重写，而应该在现有接口上扩展。
+
+### 1.1 已完成的 v2.6.0 增量
+
+- Phase 1：`build/clean` 配置化，`clean` 策略系统，风险检测与 `CleanRiskError` 已完成。
+- Phase 2：`preferences` 配置层与 `seedling config show/set/unset/reset` 已完成。
+- Phase 3：`.seedling/commands.json` 规格化工具、`seedling tools list/add/remove/validate/export` 与 generated tool 注册已完成。
+- Phase 4：`seedling strip-comments` 与 `scan --strip-comments` 已完成，当前实现以 Python + 保守 inline comment 规则为主。
+- 验证：上述增量已有 common 环境 `pytest` 与 e2e 覆盖通过。
+
+### 1.2 仍未完成的部分
+
+- Phase 5：代码统计模块（`seedling stats`、`scan --stats`）尚未开始。
+- Phase 6：异常体系补全仅完成了 `CleanRiskError`，其余异常与统一错误格式仍未完成。
+- Phase 7：Agent Skill 与 token 节省评估尚未开始。
+- Phase 8：Build Oracle 高频生成式测试尚未开始。
+- 配置策略补充任务：默认不生成项目根 `.seedling.json`；仅当全局配置显式启用“生成项目根本地配置”时才生成该文件。
+- Release polish：README / CHANGELOG / CI / 最终发布文案尚未统一收尾。
 
 ---
 
@@ -114,6 +131,12 @@
 目标：让 `build` 和 `clean` 都能读取 `~/.seedling/config.json` 与项目 `.seedling.json`，同时让 `clean` 从固定白名单升级为可配置策略系统。
 
 这是下一轮最推荐优先实现的任务。
+
+### 当前状态
+
+- 已完成。
+- 现状包括：`build` 支持配置驱动的默认 target / check / overwrite；`clean` 支持 `python-standard` / `node-modules` / `aggressive` 策略、风险拦截、`candidates-only` 外部脚本模式。
+- 已有相关 unit + e2e 覆盖通过。
 
 ### 3.1 build 配置
 
@@ -213,6 +236,10 @@ clean 必须增加删除风险评分器：
 - E2E：配置 clean 策略后执行 `clean --dry-run` 和真实 clean。
 - E2E：危险配置必须失败且不删除文件。
 
+### 当前状态
+
+- 已完成，以上测试项已落地。
+
 ---
 
 ## 4. Phase 2：记忆力与用户偏好系统
@@ -245,6 +272,11 @@ clean 必须增加删除风险评分器：
 - E2E：`seedling config set` 后执行 `scan`，确认默认行为变化。
 - 配置损坏时仍走 `ConfigurationCorruptionError`。
 
+### 当前状态
+
+- 已完成。
+- `preferences` 已接入全局配置，并提供 `seedling config show/set/unset/reset`。
+
 ---
 
 ## 5. Phase 3：`.seedling` 规格化命令工具配置
@@ -262,6 +294,12 @@ clean 必须增加删除风险评分器：
 ```
 
 或继续支持项目根 `.seedling.json` 中的 `commands.generated` 段。
+
+### 补充约束（项目根配置文件生成策略）
+
+- 默认不自动生成项目根 `.seedling.json`。
+- 只有当全局配置中显式开启“生成项目根本地配置文件”选项时，才允许创建该文件。
+- 未开启该全局选项时，项目根保持无 `.seedling.json` 也应视为正常状态。
 
 ### 规格化命令格式
 
@@ -303,6 +341,11 @@ clean 必须增加删除风险评分器：
 - `seedling tools validate`
 - `seedling tools export`
 
+### 当前状态
+
+- 已完成。
+- 已支持 `.seedling/commands.json` 规格化工具，以及 `seedling tools list/add/remove/validate/export`。
+
 ### 安全要求
 
 - shell 类型命令默认禁止危险字符拼接。
@@ -314,6 +357,12 @@ clean 必须增加删除风险评分器：
 
 - 单元测试：schema 校验、命令生成、参数渲染、危险 shell 拦截。
 - E2E：从 spec 添加工具、执行工具、删除工具、确认 help 消失。
+
+### 当前状态
+
+- 已完成第一版。
+- shell spec 的危险 token 已拦截；API spec 的 header secret 只允许从环境变量读取。
+- 仍待补充：项目根 `.seedling.json` 的“默认不生成，需全局开关显式启用后才生成”策略。
 
 ---
 
@@ -353,6 +402,12 @@ seedling scan . --full --strip-comments
 - Python docstring、行尾注释、字符串中 `#`。
 - JS/TS/C 风格注释与字符串碰撞。
 - E2E：剥离指定文件并确认原文件未被默认修改。
+
+### 当前状态
+
+- 已完成第一版。
+- 当前已支持：`seedling strip-comments path --check/--out/--in-place`，以及 `scan --strip-comments`。
+- Python 采用 `ast + tokenize`，其他语言先采用保守的 inline comment 规则。
 
 ---
 
@@ -618,8 +673,10 @@ v2.6.0 全部功能完成后，README 需要统一更新，不能只补几个命
 
 ## 13. 下一步建议
 
-下一轮优先做：`Clean Strategy + build/clean 配置化`。
+下一轮优先做：`代码统计模块`。
 
-这是当前路线中依赖最少、收益最高的一块：它能把 `clean` 从固定白名单升级为可配置策略，同时把危险删除检测正式纳入系统安全边界。
+理由：
 
-完成该阶段后，建议立刻补 README 的配置与 clean 部分草稿，避免功能堆积后文档一次性失控。
+- Phase 1–4 已经把配置、工具扩展、注释剥离铺好。
+- `stats` 是后续 token 节省度量和 agent skill 的直接底层能力。
+- 相比 skill / Oracle，它依赖更少，适合继续保持垂直切片推进。

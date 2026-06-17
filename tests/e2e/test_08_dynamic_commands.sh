@@ -57,7 +57,7 @@ if [ $STATUS -ne 0 ]; then
     echo -e "${RED}seedling --help failed.${NC}"
     exit 1
 fi
-if [[ "$HELP_OUTPUT" != *"custom-audit"* ]] || [[ "$HELP_OUTPUT" != *"scan"* ]] || [[ "$HELP_OUTPUT" != *"build"* ]] || [[ "$HELP_OUTPUT" != *"clean"* ]]; then
+if [[ "$HELP_OUTPUT" != *"custom-audit"* ]] || [[ "$HELP_OUTPUT" != *"scan"* ]] || [[ "$HELP_OUTPUT" != *"build"* ]] || [[ "$HELP_OUTPUT" != *"clean"* ]] || [[ "$HELP_OUTPUT" != *"config"* ]] || [[ "$HELP_OUTPUT" != *"tools"* ]]; then
     echo -e "${RED}Root command help did not include builtins and plugin command.${NC}"
     exit 1
 fi

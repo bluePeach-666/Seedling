@@ -6,8 +6,8 @@ from typing import List, Dict, Any, Tuple
 class AbstractBlueprintParser(ABC):
     @abstractmethod
     def parse(
-        self, 
-        source_file: Path, 
+        self,
+        source_file: Path,
         target_path: Path
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Tuple[Path, str]]]:
         pass
@@ -16,9 +16,9 @@ class AbstractBlueprintParser(ABC):
 class AbstractBuildPlugin(ABC):
     @abstractmethod
     def execute(
-        self, 
-        parsed_items: List[Dict[str, Any]], 
-        contents: Dict[str, Tuple[Path, str]], 
+        self,
+        parsed_items: List[Dict[str, Any]],
+        contents: Dict[str, Tuple[Path, str]],
         target_path: Path
     ) -> bool:
         pass
@@ -27,10 +27,11 @@ class AbstractBuildPlugin(ABC):
 class AbstractBuildExecutor(ABC):
     @abstractmethod
     def execute(
-        self, 
-        parsed_items: List[Dict[str, Any]], 
-        contents: Dict[str, Tuple[Path, str]], 
-        target_path: Path, 
-        force_mode: bool = False
+        self,
+        parsed_items: List[Dict[str, Any]],
+        contents: Dict[str, Tuple[Path, str]],
+        target_path: Path,
+        force_mode: bool = False,
+        allow_overwrite: bool = False
     ) -> bool:
         pass

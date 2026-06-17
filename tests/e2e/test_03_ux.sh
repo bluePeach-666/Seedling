@@ -6,6 +6,16 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$DIR/common.sh"
 set -e
 
+CONFIG_HOME="$HOME/seedling_ux_home"
+rm -rf "$CONFIG_HOME"
+mkdir -p "$CONFIG_HOME"
+export HOME="$CONFIG_HOME"
+export USERPROFILE="$CONFIG_HOME"
+export TEST_DIR="$HOME/tmp/seedling_test_sandbox"
+export OUT_DIR="$HOME/tmp/seedling_test_out"
+
+setup_sandbox
+
 echo -e "  -> Testing UX: Smart Garbage Interception (v2.5.1 New Feature)..."
 set +e
 OUTPUT=$(scan "$TEST_DIR" < /dev/null 2>&1)
@@ -64,5 +74,45 @@ OUTPUT=$(scan "$TEST_DIR" -q -o "$OUT_DIR" -n "quiet_test.md" 2>&1)
 set -e
 if [[ -n "$OUTPUT" ]]; then
     echo -e "${RED}Quiet mode failed! Expected no stdout.${NC}"
+    exit 1
+fi
+
+echo -e "  -> Testing UX: Strip Comments Scan Mode..."
+cat << 'EOF' > "$TEST_DIR/comment_sample.py"
+"""module doc"""
+value = '# keep'
+# remove line
+EOF
+cat << EOF > "$TEST_DIR/.seedling.json"
+{"scan":{"strip_comments":true}}
+EOF
+set +e
+scan "$TEST_DIR" --full -o "$OUT_DIR" -n "strip_comments.md" >/dev/null 2>&1
+STATUS=$?
+set -e
+if [ $STATUS -ne 0 ]; then
+    echo -e "${RED}Scan --strip-comments failed.${NC}"
+    exit 1
+fi
+if grep -q "module doc" "$OUT_DIR/strip_comments.md" || grep -q "^# remove line$" "$OUT_DIR/strip_comments.md"; then
+    echo -e "${RED}Strip comments mode failed to remove Python comments/docstrings.${NC}"
+    exit 1
+fi
+if ! grep -q "# keep" "$OUT_DIR/strip_comments.md"; then
+    echo -e "${RED}Strip comments mode removed string literals unexpectedly.${NC}"
+    exit 1
+fi
+
+echo -e "  -> Testing UX: Root strip-comments Command..."
+set +e
+OUTPUT=$(seedling strip-comments "$TEST_DIR/comment_sample.py" --check 2>&1)
+STATUS=$?
+set -e
+if [ $STATUS -ne 0 ]; then
+    echo -e "${RED}seedling strip-comments --check failed.${NC}"
+    exit 1
+fi
+if [[ "$OUTPUT" != *"saved_tokens"* ]]; then
+    echo -e "${RED}strip-comments check did not report token savings.${NC}"
     exit 1
 fi

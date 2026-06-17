@@ -1,6 +1,6 @@
 """
-The underlying tool chain and infrastructure of the Seedling-tools.  
-Copyright (c) 2026 Kaelen Chow. All rights reserved.  
+The underlying tool chain and infrastructure of the Seedling-tools.
+Copyright (c) 2026 Kaelen Chow. All rights reserved.
 """
 
 from __future__ import annotations
@@ -12,7 +12,8 @@ from .exceptions import (
     ConfigurationLoadError,
     ConfigurationCorruptionError,
     ConfigurationWriteError,
-    PluginLoadError
+    PluginLoadError,
+    CleanRiskError
 )
 from .constants import FileSettings
 from .patterns import SingletonMeta
@@ -37,6 +38,7 @@ __all__ = [
     "ConfigurationCorruptionError",
     "ConfigurationWriteError",
     "PluginLoadError",
+    "CleanRiskError",
     "FileSettings",
     "get_package_version",
     "get_recursion_limit",
